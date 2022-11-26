@@ -15,6 +15,8 @@ import MapView from "@arcgis/core/views/MapView";
 import Map from "@arcgis/core/Map";
 import MapImageLayer from "@arcgis/core/layers/MapImageLayer"
 import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
+import Legend from "@arcgis/core/widgets/Legend"
+import LayerList from "@arcgis/core/widgets/LayerList"
 
 var baseurl = "https://ncdotsandbox.cnr.ncsu.edu/arcgis/rest/services/DemographicApp/DemographicWebMap/MapServer/"
 
@@ -33,14 +35,16 @@ export default {
     methods:{
         async loadMap(){
             console.log("here")
-            var layer = await this.makeLayer(1, "COUNTIES", "NCDOT_Demographics.dbo.B02001", "B02001_002", "Race|Total Population|White Alone", "2019", true, "B02001_001")
-            this.renderLayer(layer, "NCDOT_Demographics.dbo.B02001", "B02001_002", true, "B02001_002", "NCDOT_Demographics.dbo.Counties", "Race|Total Population|White Alone", )
-
+            var layer = await this.makeLayer(1, "Counties", "NCDOT_Demographics.dbo.B02001", "B02001_002", "Race|Total Population|White Alone", "2019", true, "B02001_001")
+            
+            
+            await this.renderLayer(layer, "NCDOT_Demographics.dbo.B02001", "B02001_002", false, "B02001_002", "NCDOT_Demographics.dbo.Counties", "Race|Total Population|White Alone", )
             this.map = new Map({
                 basemap: "gray",
-                layers:layer
+                layers:[layer]
             })
-
+            // this.map.add(layer)
+            // this.map.add(new_layer)
             console.log(layer)
             this.view =  new MapView({
                 container: this.$el,
@@ -48,6 +52,21 @@ export default {
                 center: [-79.59999218313682, 35.86808963573905],
                 zoom: 8,            
             });
+            var legend = new Legend({
+              view: this.view,
+            });
+          this.view.ui.add(legend, "bottom-right");
+          const layerList = new LayerList({
+            view: this.view
+          });
+          console.log(layer)
+          // this.view.zoom = layer.sublayers.items[0].fullExtent.extent
+
+          // Add widget to the top right corner of the view
+          this.view.ui.add(layerList, "top-right");
+         
+            // this.map.layers=[layer]
+            console.log(this.map)
         },
         async makeLayer(geo_index, geo_name, table_name, field_name, field_alias, year, normalize, normalizationField){
 
@@ -66,8 +85,8 @@ export default {
                     {
                         title: "Census Data",
                         id: 0,
-                        opacity: 0.75,
-                        definitionExpression: `${table_name}.year = date'1/1/${year}'${plus_def} `,              
+                        // opacity: 0.75,
+                        // definitionExpression: `${table_name}.year = date'1/1/${year}'${plus_def} `,              
                         source: {
                             // indicates the source of the sublayer is a dynamic data layer
                             type: "data-layer",
@@ -144,18 +163,8 @@ export default {
           console.log(min)
           
           console.log(field_array)
-          var query = census_data_layer.createQuery();
-          query.outStatistics = [fieldMax, fieldMin]
-          query.where="1=1"
-          console.log(query)
-          census_data_layer.queryFeatures(query)
-            .then(function(response){
-              console.log(response)
-              var stats = response.features[0].attributes;
-              max = stats.fieldmax
-              min = stats.fieldmin
-              console.log(`${table_name}.${field_name}`)
-              if (normalize){
+
+          if (normalize === true){
                 var renderer = new ClassBreaksRenderer({
                 type: "class-breaks",
                 // attribute of interest - Earthquake magnitude
@@ -198,48 +207,49 @@ export default {
               });
 
               }else{
-              var renderer = new ClassBreaksRenderer({
-                type: "class-breaks",
-                // attribute of interest - Earthquake magnitude
-                field: `${table_name}.${field_name}`,
-                classBreakInfos: [
-                  {
-                    minValue: 0,  // 0 acres
-                    maxValue:0,  // 200,000 acres
-                    symbol: { type: "simple-fill", color: "#a2a4a6"},
-                    label: "0"  
-                  },
-                  {
-                    minValue: min + 1,  // 0 acres
-                    maxValue: max/4,  // 200,000 acres
-                    symbol: { type: "simple-fill", color: layerColors[3]},  // will be assigned sym1
-                    label: `${min + 1} - ${max/4}`
-                  },
-                  {
-                    minValue: max/4 + 1,  // 0 acres
-                    maxValue: max/4*2,  // 200,000 acres
-                    symbol: { type: "simple-fill", color: layerColors[2]},  // will be assigned sym1
-                    label: `${max/4 + 1} - ${max/4*2}`
-                  },
-                  {
-                    minValue: max/4 *2+ 1,  // 0 acres
-                    maxValue: max/4*3,  // 200,000 acres
-                    symbol: { type: "simple-fill", color: layerColors[1]},  // will be assigned sym1
-                    label: `${max/4*2 + 1} - ${max/4*3}`
-                  },
-                  {
-                    minValue: max/4 *3+ 1,  // 0 acres
-                    maxValue: max,  // 200,000 acres
-                    symbol: { type: "simple-fill", color: layerColors[0]},  // will be assigned sym1
-                    label: `${max/4*3 + 1} - ${max}`
-                  },
-                  
-                ],
+                var renderer = new ClassBreaksRenderer({
+                  type: "class-breaks",
+                  // attribute of interest - Earthquake magnitude
+                  field: `${table_name}.${field_name}`,
+                  classBreakInfos: [
+                    {
+                      minValue: 0,  // 0 acres
+                      maxValue:0,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: "#a2a4a6"},
+                      label: "0"  
+                    },
+                    {
+                      minValue: min + 1,  // 0 acres
+                      maxValue: max/4,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: layerColors[3]},  // will be assigned sym1
+                      label: `${min + 1} - ${max/4}`
+                    },
+                    {
+                      minValue: max/4 + 1,  // 0 acres
+                      maxValue: max/4*2,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: layerColors[2]},  // will be assigned sym1
+                      label: `${max/4 + 1} - ${max/4*2}`
+                    },
+                    {
+                      minValue: max/4 *2+ 1,  // 0 acres
+                      maxValue: max/4*3,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: layerColors[1]},  // will be assigned sym1
+                      label: `${max/4*2 + 1} - ${max/4*3}`
+                    },
+                    {
+                      minValue: max/4 *3+ 1,  // 0 acres
+                      maxValue: max,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: layerColors[0]},  // will be assigned sym1
+                      label: `${max/4*3 + 1} - ${max}`
+                    },
+                    
+                  ],
 
-              });
-            };
+                });
+              }
+              
 
-
+          console.log(renderer)
           census_data_layer.renderer = renderer;
           var popupTemplate = {
                 // autocasts as new PopupTemplate()
@@ -301,14 +311,15 @@ export default {
               return div;
               
             };
-              // return renderer
+
+            return layer
 
 
                     
           // })
 
 
-        })}
+        }
     },
     data(){
         return{
