@@ -2,6 +2,8 @@
   <div>
     <Toolbar>
             <template #start>
+              
+              <!-- <ToggleButton  onLabel="Hide Filters" offLabel="Show Filters" v-model="showfilters"  /> -->
                 <!-- <Button label="New" icon="pi pi-plus" class="mr-2" />
                 <Button label="Upload" icon="pi pi-upload" class="p-button-success" />
                 <i class="pi pi-bars p-toolbar-separator mr-2" /> -->
@@ -9,29 +11,43 @@
             </template>
 
             <template #end>
+              <ToggleButton onIcon="pi pi-bars" offIcon="pi pi-bars"  v-model="showmenu"  />
                 <!-- <Button icon="pi pi-search" class="mr-2" />
                 <Button icon="pi pi-calendar" class="p-button-success mr-2" />
                 <Button icon="pi pi-times" class="p-button-danger" /> -->
             </template>
     </Toolbar>
-    <Splitter style="height: 100vh">
-          <SplitterPanel v-if="showcharts" :size="40" :minSize="10">
-            <div v-if="showcharts" style="width:100%">
+    <div style="height: 90vh">
+      <Map @selectPolys="selectPolysHandler($event)"></Map>
+      <Sidebar :visible.sync="showmenu" :baseZIndex="1000" position="right" :modal=false  style="height:100vh">
+                <Panel style="height:100vh">
+                  <Dropdown v-model="selectedGeometry" :options="geometries" optionLabel="name" placeholder="Select a Geometry" />
+
+                </Panel>
+
+    </Sidebar>
+    </div>
+   
+    <!-- <Splitter style="height: 90vh">
+          <SplitterPanel :size="60">
+                <Map @selectPolys="selectPolysHandler($event)"></Map>
+          </SplitterPanel>
+
+            <SplitterPanel v-if="showmenu" :size="40" :minSize="10" style="width:100%">
               <div style="width:90%">
-                <Chart type="bar" :data="barChartData" :options="basicOptions" />
+                <Dropdown v-model="selectedGeometry" :options="geometries" optionLabel="name" placeholder="Select a Geometry" />
               </div>
 
-             
-             
+                <div style="width:90%">
+                  <Chart type="bar" :data="barChartData" :options="basicOptions" />
+                </div>
 
-            </div>
-           
+                
 
-          </SplitterPanel>
-          <SplitterPanel :size="60">
-            <Map @selectPolys="selectPolysHandler($event)"></Map>
-          </SplitterPanel>
-  </Splitter>
+            </SplitterPanel>
+
+          
+  </Splitter> -->
 
  </div>
     
@@ -47,9 +63,17 @@ export default {
   },
   data(){
         return{
-            showcharts:true,
+            showcharts:false,
             barChartData: null,
-            basicOptions: null
+            basicOptions: null,
+            showfilters:false,
+            showmenu:false,
+            geometries: [
+              {name:"Counties", code:"1",other:"other"},
+              {name:"BlockGroups", code:"0", other:"other"}
+          ],
+            selectedGeometry:null
+
 
         }
     },

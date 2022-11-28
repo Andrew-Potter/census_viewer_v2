@@ -14,6 +14,7 @@
 import MapView from "@arcgis/core/views/MapView";
 import Map from "@arcgis/core/Map";
 import MapImageLayer from "@arcgis/core/layers/MapImageLayer"
+import FeatureLayer from "@arcgis/core/layers/FeatureLayer"
 import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
 import Legend from "@arcgis/core/widgets/Legend"
 import LayerList from "@arcgis/core/widgets/LayerList"
@@ -35,17 +36,21 @@ export default {
     methods:{
         async loadMap(){
             console.log("here")
-            var layer = await this.makeLayer(1, "Counties", "NCDOT_Demographics.dbo.B02001", "B02001_002", "Race|Total Population|White Alone", "2019", true, "B02001_001")
+            // var layer = await this.makeLayer(1, "Counties", "NCDOT_Demographics.dbo.B02001", "B02001_002", "Race|Total Population|White Alone", "2018", true, "B02001_001")
+            this.geometry = await this.makeGeometry();
+            this.attributes = await this.getAttributes(1, "Race|Total Population|White Alone", null)
             
-            
-            await this.renderLayer(layer, "NCDOT_Demographics.dbo.B02001", "B02001_002", false, "B02001_002", "NCDOT_Demographics.dbo.Counties", "Race|Total Population|White Alone", )
+            // await this.renderLayer(layer, "NCDOT_Demographics.dbo.B02001", "B02001_002", false, "B02001_002", "NCDOT_Demographics.dbo.Counties", "Race|Total Population|White Alone",'2018' )
             this.map = new Map({
                 basemap: "gray",
-                layers:[layer]
+                layers:[this.geometry]
             })
+
+            this.renderAttributes()
+
             // this.map.add(layer)
             // this.map.add(new_layer)
-            console.log(layer)
+            // console.log(layer)
             this.view =  new MapView({
                 container: this.$el,
                 map: this.map,
@@ -56,68 +61,143 @@ export default {
               view: this.view,
             });
           this.view.ui.add(legend, "bottom-right");
-          const layerList = new LayerList({
-            view: this.view
-          });
-          console.log(layer)
-          // this.view.zoom = layer.sublayers.items[0].fullExtent.extent
-
-          // Add widget to the top right corner of the view
-          this.view.ui.add(layerList, "top-right");
-         
-            // this.map.layers=[layer]
-            console.log(this.map)
+       
         },
-        async makeLayer(geo_index, geo_name, table_name, field_name, field_alias, year, normalize, normalizationField){
 
-            if (geo_name.includes("Counties")){
-                var plus_def = `AND ${table_name}.geo_name LIKE '%County%'`
-            }else{
-                var plus_def = ''
-                }
-            
-                console.log(`${table_name}.year = date'1/1/${year}'${plus_def} `)
-
-            return new MapImageLayer({
-                url: baseurl,
-                title: field_alias,
-                sublayers: [
+        async makeGeometry(){
+          var geometry = new MapImageLayer({
+                  url:baseurl,
+                  title: "Census Geometry",
+                  sublayers:[
                     {
-                        title: "Census Data",
-                        id: 0,
-                        // opacity: 0.75,
-                        // definitionExpression: `${table_name}.year = date'1/1/${year}'${plus_def} `,              
-                        source: {
-                            // indicates the source of the sublayer is a dynamic data layer
-                            type: "data-layer",
-                            // this object defines the data source of the layer
-                            // in this case it's a joined table
-                            dataSource: {
-                            type: "join-table",
-                            leftTableSource: {
-                                type: "map-layer",
-                                mapLayerId: geo_index
-                            },
-                                rightTableSource: {
-                                    type: "data-layer",
-                                    dataSource: {
-                                        type: "table",
-                                        workspaceId: "5332",
-                                        dataSourceName: table_name
-                                    }
-                            },
-                                leftTableKey: "GEOID",
-                                rightTableKey: "geo_id",
-                                joinType: "left-inner-join"
-                            }
+                      id:0,
+                      visible:false,
+                      title: "BlockGroups"
                     },
+                    {
+                      id:1,
+                      visible:false,
+                      title: "Counties"
+                    },
+                    {
+                      id:2,
+                      visible:false,
+                      title: "State"
+                    },
+                    {
+                      id: 3,
+                      visible:false,
+                      title:"Tracts"
+                    },
+                    {
+                      id: 4,
+                      visible:false,
+                      title:"ZipCodes"
                     }
-                    
-                    
-                ]
-            });
+                  ]
+                })
+                return geometry
+
+        },
+        async getAttributes(geo_index, field_alias, normalizationField){
+
+          
+
+                this.table = new FeatureLayer({
+                  url:baseurl+this.selectedTableIndex,
+                  
+                })
+                // console.log(table)
+
+                var res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear}-1-1' AND geo_unit = '${this.selectedGeoUnit}'`, outFields:["geo_id", this.selectedField]})
+                console.log(res.features)
+                var attributes = []
+                var attributes_array = []
+                this.attributes_object = {}
+                res.features.forEach(element => {
+                  attributes.push(element.attributes);
+                  attributes_array.push(element.attributes[this.selectedField])
+                  this.attributes_object[element.attributes.geo_id] = element.attributes[this.selectedField]
+                });
+                this.max = Math.max(...attributes_array)
+                this.min = Math.min(...attributes_array)
+                return attributes
        },
-       async renderLayer(layer, table_name, field_name, normalize, normalize_field, geo_name, fieldAlias){
+
+       async renderAttributes(){
+
+        var renderer = new ClassBreaksRenderer({
+                  type: "class-breaks",
+                  // attribute of interest - Earthquake magnitude
+                  field: `${this.selectedField}`,
+                  classBreakInfos: [
+                    {
+                      minValue: 0,  // 0 acres
+                      maxValue:0,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: "#a2a4a6"},
+                      label: "0"  
+                    },
+                    {
+                      minValue: this.min + 1,  // 0 acres
+                      maxValue: this.max/4,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: this.layerColors[3]},  // will be assigned sym1
+                      label: `${this.min + 1} - ${this.max/4}`
+                    },
+                    {
+                      minValue: this.max/4 + 1,  // 0 acres
+                      maxValue: this.max/4*2,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: this.layerColors[2]},  // will be assigned sym1
+                      label: `${this.max/4 + 1} - ${this.max/4*2}`
+                    },
+                    {
+                      minValue: this.max/4 *2+ 1,  // 0 acres
+                      maxValue: this.max/4*3,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: this.layerColors[1]},  // will be assigned sym1
+                      label: `${this.max/4*2 + 1} - ${this.max/4*3}`
+                    },
+                    {
+                      minValue: this.max/4 *3+ 1,  // 0 acres
+                      maxValue: this.max,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: this.layerColors[0]},  // will be assigned sym1
+                      label: `${this.max/4*3 + 1} - ${this.max}`
+                    },
+                    
+                  ],
+
+                });
+        var this_sublayer = null
+        this.geometry.sublayers.items.forEach((sublayer)=>{
+          
+          if (sublayer.id == this.selectedGeometryIndex){
+            this_sublayer = sublayer
+          }
+        })
+        
+        console.log(this.$data[this_sublayer.title])
+        if(this.$data[this_sublayer.title] ===null){
+          console.log("here")
+          let geom = await this_sublayer.queryFeatures({where:"1=1", returnGeometry: true, outFields:"*"})
+          this.$data[this_sublayer.title] = geom.features
+        }
+        var fields = this_sublayer.fields
+        fields.push({"name":this.selectedField, type:"double"})
+        console.log(this_sublayer)
+        
+        this.$data[this_sublayer.title].forEach(feature=>{
+
+          feature.attributes[this.selectedField] = this.attributes_object[feature.attributes.GEOID]
+        })
+        this.activeGeometry = new FeatureLayer({
+          source:this.$data[this_sublayer.title],
+          objectIdField: "OBJECTID",
+          fields:fields
+        })
+        this.activeGeometry.renderer=renderer
+        // console.log(await this.activeGeometry.queryFeatures())
+        this.map.add(this.activeGeometry)
+       },
+
+       async renderLayer(layer, table_name, field_name, normalize, normalize_field, geo_name, fieldAlias, year){
            console.log("render ")
             console.log(layer)
             console.log(table_name)
@@ -127,7 +207,7 @@ export default {
             console.log(geo_name)
             console.log(fieldAlias)
             // var new_field_name = `NCDOT_Demographics.DEMOGRAPHICAPP.%${geo_name}.${field_name}`
-            var new_field_name = `NCDOT_Demographics.dbo.B02001.${field_name}`
+            var new_field_name = `${table_name}.${field_name}`
             console.log(new_field_name)
           var census_data_layer = layer.sublayers.find(function(sublayer) {
             return sublayer.title === "Census Data";
@@ -151,9 +231,18 @@ export default {
           var max
           var min
 
+          // var query = census_data_layer.createQuery();
+          // query.outStatistics = [fieldMax, fieldMin]
+          // var resp =  await census_data_layer.queryFeatures(query)
+
+          // console.log(resp)
+
              
           const layerColors = ["#910000", "#c33910", "#f6711f", "#fbaf52", "#ffed85"];
+          console.log(year)
+          // var res = await census_data_layer.queryFeatures({where:`${table_name}.year = DATE'${year}-1-1' `,outFields:[new_field_name]})
           var res = await census_data_layer.queryFeatures({where:"1=1",outFields:[new_field_name]})
+
           console.log(res)
           var field_array = res.features.map(x=>x.attributes[new_field_name])
 
@@ -324,8 +413,21 @@ export default {
     data(){
         return{
             map:null,
-            view: null
-
+            view: null,
+            geometry: null,
+            table: null,
+            attributes: null,
+            attributes_object: null,
+            max: null,
+            min: null,
+            layerColors: ["#910000", "#c33910", "#f6711f", "#fbaf52", "#ffed85"],
+            selectedField: "B02001_002",
+            selectedTable: "B02001",
+            selectedTableIndex: 9,
+            selectedGeometryIndex: 1,
+            Counties: null,
+            selectedYear: "2019",
+            selectedGeoUnit: "Counties"
         }
     }
 }
