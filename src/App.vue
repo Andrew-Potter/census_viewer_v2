@@ -28,26 +28,8 @@
     </Sidebar>
     </div>
    
-    <!-- <Splitter style="height: 90vh">
-          <SplitterPanel :size="60">
-                <Map @selectPolys="selectPolysHandler($event)"></Map>
-          </SplitterPanel>
 
-            <SplitterPanel v-if="showmenu" :size="40" :minSize="10" style="width:100%">
-              <div style="width:90%">
-                <Dropdown v-model="selectedGeometry" :options="geometries" optionLabel="name" placeholder="Select a Geometry" />
-              </div>
 
-                <div style="width:90%">
-                  <Chart type="bar" :data="barChartData" :options="basicOptions" />
-                </div>
-
-                
-
-            </SplitterPanel>
-
-          
-  </Splitter> -->
 
  </div>
     
