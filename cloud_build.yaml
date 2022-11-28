@@ -1,8 +1,6 @@
 //cloud-build.yaml
 steps:
-#Create .env file from Google 
-Cloud Build substitution 
-variables
+#Create .env file from Google Cloud Build substitution variables
 - name: node
   entrypoint: npm
   args: ["run", "create-env"]
