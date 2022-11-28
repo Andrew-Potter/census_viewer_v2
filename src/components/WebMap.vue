@@ -35,7 +35,7 @@ export default {
     },
     methods:{
         async loadMap(){
-            console.log("here")
+            console.log("build?")
             // var layer = await this.makeLayer(1, "Counties", "NCDOT_Demographics.dbo.B02001", "B02001_002", "Race|Total Population|White Alone", "2018", true, "B02001_001")
             this.geometry = await this.makeGeometry();
             this.attributes = await this.getAttributes(1, "Race|Total Population|White Alone", null)
