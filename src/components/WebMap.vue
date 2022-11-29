@@ -41,7 +41,7 @@ export default {
             
             // await this.renderLayer(layer, "NCDOT_Demographics.dbo.B02001", "B02001_002", false, "B02001_002", "NCDOT_Demographics.dbo.Counties", "Race|Total Population|White Alone",'2018' )
             this.map = new Map({
-                basemap: "gray",
+                // basemap: "osm-standard",
                 layers:[this.geometry]
             })
 
