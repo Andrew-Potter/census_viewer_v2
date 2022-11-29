@@ -179,6 +179,7 @@ export default {
         if(this.$data[this_sublayer.title] ===null){
           console.log("here")
           let geom = await this_sublayer.queryFeatures({where:"1=1", returnGeometry: true, outFields:"*"})
+          console.log(geom)
           this.$data[this_sublayer.title] = geom.features
         }
         var fields = this_sublayer.fields
