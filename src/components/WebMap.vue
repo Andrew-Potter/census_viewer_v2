@@ -15,8 +15,10 @@ import MapView from "@arcgis/core/views/MapView";
 import Map from "@arcgis/core/Map";
 import MapImageLayer from "@arcgis/core/layers/MapImageLayer"
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer"
-import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
-import Legend from "@arcgis/core/widgets/Legend"
+// import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
+import UniqueValueRenderer from "@arcgis/core/renderers/UniqueValueRenderer"
+// import Legend from "@arcgis/core/widgets/Legend"
+// import LayerList from "@arcgis/core/widgets/LayerList"
 
 // import esriRequest from "@arcgis/core/request"
 
@@ -45,9 +47,9 @@ export default {
     },
     methods:{
         async executeQuery(){
-          this.geometry = await this.makeGeometry();
+          // this.geometry = await this.makeGeometry();
           this.attributes = await this.getAttributes()
-          this.map.layers = [this.geometry]
+          // this.map.layers = [this.geometry]
           this.renderAttributes()
 
         },
@@ -56,8 +58,10 @@ export default {
 
             
             // await this.renderLayer(layer, "NCDOT_Demographics.dbo.B02001", "B02001_002", false, "B02001_002", "NCDOT_Demographics.dbo.Counties", "Race|Total Population|White Alone",'2018' )
+            this.geometry = await this.makeGeometry();
             this.map = new Map({
                 basemap: "gray",
+                layers: [this.geometry]
             })
 
 
@@ -67,10 +71,14 @@ export default {
                 center: [-79.59999218313682, 35.86808963573905],
                 zoom: 8,            
             });
-            var legend = new Legend({
-              view: this.view,
-            });
-          this.view.ui.add(legend, "bottom-right");
+          //   var legend = new Legend({
+          //     view: this.view,
+          //   });
+          // this.view.ui.add(legend, "bottom-right");
+          // let layerlist = new LayerList({
+          //   view: this.view
+          // });
+          // this.view.ui.add(layerlist, "top-right");
        
         },
 
@@ -118,9 +126,7 @@ export default {
                   url:baseurl+this.selectedTable.id,
                   
                 })
-                // console.log(table)
-                console.log(`year = DATE '${this.selectedYear}-1-1' AND geo_unit = '${this.selectedGeoUnit.alias}'`)
-                console.log(this.selectedField.id)
+                console.log(baseurl+this.selectedTable.id)
                 var queryGeoName = []
 
                 for (let i = 0; i < this.selectedGeoUnit.alias.length; i++) {
@@ -131,110 +137,130 @@ export default {
                   }
                   
                 }
-
-                var res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear}-1-1' AND geo_unit = '${queryGeoName.join("")}'`, outFields:["geo_id", this.selectedField.id]})
-                if (res.features == null){
+                let geo_name = queryGeoName.join("")
+                let res;
+                let features=[];
+                res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear}-1-1' AND geo_unit = '${geo_name}'`, outFields:["geo_id", this.selectedField.id]})
+                console.log(res)
+                if (res.features.length === 0){
+                  console.log("here")
+                  res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear}-1-1'`, outFields:["geo_id", this.selectedField.id]})
+                  if (geo_name.includes("Counties")){
+                    res.features.forEach(feature =>{
+                      if (feature.attributes.geo_id.length ===5){
+                        features.push(feature)
+                      }
+                    })
+                  }else if(geo_name.includes("Tracts")){
+                    res.features.forEach(feature =>{
+                      if (feature.attributes.geo_id.length ===11){
+                        features.push(feature)
+                      }
+                    })
+                  }
+                }else{
+                  features = res.features
+                }
+                // var res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear}-1-1' AND geo_unit = '${queryGeoName.join("")}'`, outFields:["geo_id", this.selectedField.id]})
+                if (features.length == 0){
                   return
                 }
-                console.log(res.features)
+                console.log(features)
+
                 var attributes = []
                 var attributes_array = []
                 this.attributes_object = {}
-                res.features.forEach(element => {
+                this.uniqueValueInfos = []
+                features.forEach(element => {
                   attributes.push(element.attributes);
                   attributes_array.push(element.attributes[this.selectedField.id])
                   this.attributes_object[element.attributes.geo_id] = element.attributes[this.selectedField.id]
-                  console.log(this.attributes_object)
+                 
                 });
                 this.max = Math.max(...attributes_array)
                 this.min = Math.min(...attributes_array)
+                
+                for (const property in this.attributes_object){
+                  if(this.attributes_object[property] === 0){
+                    this.uniqueValueInfos.push({value:property, symbol: { type: "simple-fill", color: "#a2a4a6"}})
+                  }else if((this.attributes_object[property] > this.min + 1) & ( this.attributes_object[property] < this.max/4)){
+                    this.uniqueValueInfos.push({value:property, symbol: { type: "simple-fill", color: this.layerColors[3]}})
+                  }else if((this.attributes_object[property] > this.max/4 + 1) & ( this.attributes_object[property] < this.max/4*2)){
+                    this.uniqueValueInfos.push({value:property, symbol: { type: "simple-fill", color: this.layerColors[2]}})
+                  }else{
+                    this.uniqueValueInfos.push({value:property, symbol: { type: "simple-fill", color: this.layerColors[1]}})
+                  }
+                }
+
                 return attributes
         },
        async renderAttributes(){
 
-        var renderer = new ClassBreaksRenderer({
-                  type: "class-breaks",
-                  // attribute of interest - Earthquake magnitude
-                  field: `${this.selectedField.id}`,
-                  classBreakInfos: [
-                    {
-                      minValue: 0,  // 0 acres
-                      maxValue:0,  // 200,000 acres
-                      symbol: { type: "simple-fill", color: "#a2a4a6"},
-                      label: "0"  
-                    },
-                    {
-                      minValue: this.min + 1,  // 0 acres
-                      maxValue: this.max/4,  // 200,000 acres
-                      symbol: { type: "simple-fill", color: this.layerColors[3]},  // will be assigned sym1
-                      label: `${this.min + 1} - ${this.max/4}`
-                    },
-                    {
-                      minValue: this.max/4 + 1,  // 0 acres
-                      maxValue: this.max/4*2,  // 200,000 acres
-                      symbol: { type: "simple-fill", color: this.layerColors[2]},  // will be assigned sym1
-                      label: `${this.max/4 + 1} - ${this.max/4*2}`
-                    },
-                    {
-                      minValue: this.max/4 *2+ 1,  // 0 acres
-                      maxValue: this.max/4*3,  // 200,000 acres
-                      symbol: { type: "simple-fill", color: this.layerColors[1]},  // will be assigned sym1
-                      label: `${this.max/4*2 + 1} - ${this.max/4*3}`
-                    },
-                    {
-                      minValue: this.max/4 *3+ 1,  // 0 acres
-                      maxValue: this.max,  // 200,000 acres
-                      symbol: { type: "simple-fill", color: this.layerColors[0]},  // will be assigned sym1
-                      label: `${this.max/4*3 + 1} - ${this.max}`
-                    },
-                    
-                  ],
 
-                });
+        // var renderer = new ClassBreaksRenderer({
+        //           type: "class-breaks",
+        //           // attribute of interest - Earthquake magnitude
+        //           field: `${this.selectedField.id}`,
+        //           classBreakInfos: [
+        //             {
+        //               minValue: 0,  // 0 acres
+        //               maxValue:0,  // 200,000 acres
+        //               symbol: { type: "simple-fill", color: "#a2a4a6"},
+        //               label: "0"  
+        //             },
+        //             {
+        //               minValue: this.min + 1,  // 0 acres
+        //               maxValue: this.max/4,  // 200,000 acres
+        //               symbol: { type: "simple-fill", color: this.layerColors[3]},  // will be assigned sym1
+        //               label: `${this.min + 1} - ${this.max/4}`
+        //             },
+        //             {
+        //               minValue: this.max/4 + 1,  // 0 acres
+        //               maxValue: this.max/4*2,  // 200,000 acres
+        //               symbol: { type: "simple-fill", color: this.layerColors[2]},  // will be assigned sym1
+        //               label: `${this.max/4 + 1} - ${this.max/4*2}`
+        //             },
+        //             {
+        //               minValue: this.max/4 *2+ 1,  // 0 acres
+        //               maxValue: this.max/4*3,  // 200,000 acres
+        //               symbol: { type: "simple-fill", color: this.layerColors[1]},  // will be assigned sym1
+        //               label: `${this.max/4*2 + 1} - ${this.max/4*3}`
+        //             },
+        //             {
+        //               minValue: this.max/4 *3+ 1,  // 0 acres
+        //               maxValue: this.max,  // 200,000 acres
+        //               symbol: { type: "simple-fill", color: this.layerColors[0]},  // will be assigned sym1
+        //               label: `${this.max/4*3 + 1} - ${this.max}`
+        //             },
+                    
+        //           ],
+
+        //         });
+        var renderer = new UniqueValueRenderer({
+          field: "GEOID",
+          uniqueValueInfos: this.uniqueValueInfos
+        })
         var this_sublayer = null
+        console.log(this.geometry.sublayers)
         this.geometry.sublayers.items.forEach((sublayer)=>{
           console.log(this.selectedGeoUnit.id)
           if (sublayer.id == this.selectedGeoUnit.id){
             this_sublayer = sublayer
+          }else{
+            sublayer.visible=false;
           }
         })
-        console.log(this_sublayer)
-        
-        console.log(this.$data[this_sublayer.title])
-        // if(this.$data[this_sublayer.title] ===null){
-        //   console.log("here")
-        //   let geom = await this_sublayer.queryFeatures({where:"1=1", returnGeometry: true, outFields:"*"})
-        //   console.log(geom)
-        //   this.$data[this_sublayer.title] = geom.features
-        // }
-        let geom = await this_sublayer.queryFeatures({where:"1=1", returnGeometry: true, outFields:"*"})
-        console.log(geom)
-        var fields = this_sublayer.fields
-        fields.push({"name":this.selectedField.id, type:"double"})
+        this_sublayer.visible=true;
+
+        this_sublayer.renderer = renderer
         console.log(this_sublayer)
 
-        geom.features.forEach(feature=>{
 
-          feature.attributes[this.selectedField.id] = this.attributes_object[feature.attributes.GEOID]
-        })
+        // this_sublayer.definitionExpression = `GEOID in ("${Object.keys(this.attributes_object).join('", "')}")`
+
+        return
+
         
-        // this.$data[this_sublayer.title].forEach(feature=>{
-
-        //   feature.attributes[this.selectedField.id] = this.attributes_object[feature.attributes.GEOID]
-        // })
-        this.activeGeometry = new FeatureLayer({
-          source:geom.features,
-          objectIdField: "OBJECTID",
-          fields:fields
-        })
-        // this.activeGeometry = new FeatureLayer({
-        //   source:this.$data[this_sublayer.title],
-        //   objectIdField: "OBJECTID",
-        //   fields:fields
-        // })
-        this.activeGeometry.renderer=renderer
-        // console.log(await this.activeGeometry.queryFeatures())
-        this.map.add(this.activeGeometry)
         },
         async loadGeometryValues(){
           // let geomValues = await esriRequest(baseurl)
@@ -259,7 +285,8 @@ export default {
             selectedGeometryIndex: 1,
             Counties: null,
             tableOptions: {},
-            layerOptions: {}
+            layerOptions: {},
+            uniqueValueInfos: []
         }
     }
 }
