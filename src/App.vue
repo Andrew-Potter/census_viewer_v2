@@ -2,7 +2,7 @@
   <div>
     <Toolbar>
             <template #start>
-              <Button label="Filters" icon="pi pi-external-link" @click="openFilters" />
+              <Button label="TEST!" icon="pi pi-external-link" @click="openFilters" />
               <Dialog header="Filters " :visible.sync="filtersOpen" :containerStyle="{width: '50vw'}">
                 <Panel style="height:100vh; text-align: left;">
                   <Dropdown v-model="selectedGeometry" :options="geometries" optionLabel="alias" placeholder="Select a Geometry" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
