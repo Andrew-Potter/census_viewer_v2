@@ -15,14 +15,15 @@ import MapView from "@arcgis/core/views/MapView";
 import Map from "@arcgis/core/Map";
 import MapImageLayer from "@arcgis/core/layers/MapImageLayer"
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer"
-// import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
+import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
 import UniqueValueRenderer from "@arcgis/core/renderers/UniqueValueRenderer"
-// import Legend from "@arcgis/core/widgets/Legend"
+import Legend from "@arcgis/core/widgets/Legend"
+import esriRequest from "@arcgis/core/request"
 // import LayerList from "@arcgis/core/widgets/LayerList"
 
 // import esriRequest from "@arcgis/core/request"
 
-var baseurl = "https://ncdotsandbox.cnr.ncsu.edu/arcgis/rest/services/DemographicApp/DemographicWebMap/MapServer/"
+var baseurl = "https://vm16-78.vclgis.cnr.ncsu.edu/arcgis/rest/services/US_Census/nc_census_app/MapServer/"
 
 
 export default {
@@ -32,7 +33,9 @@ export default {
       selectedSubjectArea: Object, 
       selectedTable: Object,
       selectedField: Object,
+      selectedNormField: Object,
       selectedYear: String, 
+      normalize: Boolean,
       runQuery: Boolean
     },
     watch:{
@@ -47,10 +50,13 @@ export default {
     },
     methods:{
         async executeQuery(){
+          this.geometry = this.makeLayer()
+          this.map.layers = [this.geometry]
+          this.renderLayer()
           // this.geometry = await this.makeGeometry();
-          this.attributes = await this.getAttributes()
+          // this.attributes = await this.getAttributes()
           // this.map.layers = [this.geometry]
-          this.renderAttributes()
+          // this.renderAttributes()
 
         },
         async loadMap(){
@@ -58,10 +64,10 @@ export default {
 
             
             // await this.renderLayer(layer, "NCDOT_Demographics.dbo.B02001", "B02001_002", false, "B02001_002", "NCDOT_Demographics.dbo.Counties", "Race|Total Population|White Alone",'2018' )
-            this.geometry = await this.makeGeometry();
+            // this.geometry = await this.makeGeometry();
             this.map = new Map({
                 basemap: "gray",
-                layers: [this.geometry]
+                // layers: [this.geometry]
             })
 
 
@@ -71,16 +77,237 @@ export default {
                 center: [-79.59999218313682, 35.86808963573905],
                 zoom: 8,            
             });
-          //   var legend = new Legend({
-          //     view: this.view,
-          //   });
-          // this.view.ui.add(legend, "bottom-right");
+            var legend = new Legend({
+              view: this.view,
+            });
+          this.view.ui.add(legend, "bottom-right");
           // let layerlist = new LayerList({
           //   view: this.view
           // });
           // this.view.ui.add(layerlist, "top-right");
        
         },
+        async populationChange (feature) {
+              var div = document.createElement("div");
+              console.log(feature)
+              // calculate the population percent change from 2010 to 2013.
+              var selectedGeoId = feature.graphic.attributes[`${this.selectedTable.name}.geo_id`]
+              this.queryGeoLayers(selectedGeoId);
+              // queryGeoLayers(selectedGeoId);
+              // selectFeatures(feature.graphic.geometry.centroid, chart, false)
+              var fieldName = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
+              var normFieldName = `census.census.${this.selectedTable.name}.${this.selectedNormField.id.toLowerCase()}`
+              let proportion = feature.graphic.attributes[fieldName] / feature.graphic.attributes[normFieldName] 
+              let percent = proportion * 100
+
+              div.innerHTML =
+                `${this.selectedField.alias}: ${feature.graphic.attributes[fieldName]} <br>
+                Total Population: ${feature.graphic.attributes[normFieldName]} <br>
+                Percent: ${percent.toFixed(2)}<br>
+                Year: ${new Date(feature.graphic.attributes[`census.census.${this.selectedTable.name}.year`]).getFullYear() + 1}
+                `
+              console.log(div.innerHTML);
+              this.view.popup.highlightEnabled = true
+              return div;
+              
+            },
+        
+        async queryGeoLayers(geoid){
+
+          // var tableAlias = this.selectedTable.alias 
+          var geomValue = this.selectedGeoUnit.id
+          console.log(geomValue)
+          var searchGeoms = ["37"]
+          var countyId;
+          if (geomValue === 0){
+            var tractId = geoid.slice(0, -1)
+            countyId = geoid.slice(0, -7)
+            searchGeoms.push(tractId)
+            searchGeoms.push(countyId)
+          } else if (geomValue === 1){
+            countyId = geoid.slice(0, -6)
+            searchGeoms.push(countyId)
+          }
+          var options = {
+            query: {
+              where: `geo_id in ('${searchGeoms.join("', '")}')`,
+              outFields: ["*"],
+              f: "json"
+            },
+            responseType: "json"
+          };
+          var response = await esriRequest(baseurl + `${this.selectedTable.id}\\query`, options)
+          console.log(response)
+          var compares = {
+            "State" : {},
+            "Counties" : {},
+            "Tracts" : {}
+          }
+          response.data.features.forEach(f =>{
+            try{
+                if (f.attributes.geo_name in compares[f.attributes.geo_unit] === false){
+                  compares[f.attributes["geo_unit"]][f.attributes.geo_name] = [f]
+                }else{
+                  compares[f.attributes["geo_unit"]][f.attributes.geo_name].push(f)
+                }
+                
+              } catch{
+                console.log("fail")
+              }
+              });
+
+          
+
+            // var compare_geo = document.getElementById("compare_geoms").options[document.getElementById("compare_geoms").value].text
+            // for (i=0; i < Object.keys(compares[compare_geo]).length; i++){
+            //   console.log(compares[compare_geo][Object.keys(compares[compare_geo])[i]])
+            //   $("#additional_filter").append($('<option></option>').attr("value", Object.keys(compares[compare_geo])[i]).text(Object.keys(compares[compare_geo])[i]))
+            // };
+            // var additional_filter_val = document.getElementById("additional_filter").value
+            //   // $("#additional_filter").append($('<option></option>').attr("value", f.attributes["subject_area"].trim()).text(f.attributes["subject_area"]))
+            
+
+            // geoCompare = [compares, compare_geo, additional_filter_val]
+            // var add_to_chart = document.getElementById("add_to_chart").checked
+            // updateChart(compares[compare_geo][additional_filter_val], chart, false, add_to_chart, false)
+
+        },
+
+        async renderLayer(){
+            
+            var census_data_layer = this.geometry.sublayers.find(function(sublayer) {
+              return sublayer.title === "Census Data";
+            });
+            console.log(census_data_layer)
+            census_data_layer.definitionExpression =  `census.census.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `
+            var statsField = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
+            console.log(statsField)
+            var fieldMax = {
+              onStatisticField: statsField,  // service field for 2015 population
+              outStatisticFieldName: "fieldmax",
+              statisticType: "max"
+            };
+  
+            var fieldMin = {
+              onStatisticField: statsField,  // service field for 2015 population
+              outStatisticFieldName: "fieldmin",
+              statisticType: "min"
+            };
+  
+            var max
+            var min
+  
+               
+            const layerColors = ["#910000", "#c33910", "#f6711f", "#fbaf52", "#ffed85"];
+            var query = census_data_layer.createQuery();
+            query.outStatistics = [fieldMax, fieldMin]
+            var response = await census_data_layer.queryFeatures(query)
+
+            console.log(response)
+              
+            var stats = response.features[0].attributes;
+            max = stats.fieldmax
+            min = stats.fieldmin
+            var renderer;
+            if (this.normalize){
+                var normField = `census.census.${this.selectedTable.name}.${this.selectedNormField.id.toLowerCase()}`
+                renderer = new ClassBreaksRenderer({
+                type: "class-breaks",
+                // attribute of interest - Earthquake magnitude
+                field: statsField,
+                normalizationField: normField,
+                classBreakInfos: [
+                  {
+                    minValue: 0,  // 0 acres
+                    maxValue:0,  // 200,000 acres
+                    symbol: { type: "simple-fill", color: "#a2a4a6"},
+                    label: "0"  
+                  },
+                  {
+                    minValue: .01,  // 0 acres
+                    maxValue: .25,  // 200,000 acres
+                    symbol: { type: "simple-fill", color: layerColors[3]},  // will be assigned sym1
+                    label: `1 - 25 %`
+                  },
+                  {
+                    minValue: .26,  // 0 acres
+                    maxValue: .50,  // 200,000 acres
+                    symbol: { type: "simple-fill", color: layerColors[2]},  // will be assigned sym1
+                    label: `26 - 50%`
+                  },
+                  {
+                    minValue: .51,  // 0 acres
+                    maxValue: .75,  // 200,000 acres
+                    symbol: { type: "simple-fill", color: layerColors[1]},  // will be assigned sym1
+                    label: `51 - 75%`
+                  },
+                  {
+                    minValue: .76,  // 0 acres
+                    maxValue: 1,  // 200,000 acres
+                    symbol: { type: "simple-fill", color: layerColors[0]},  // will be assigned sym1
+                    label: `76 - 100%`
+                  },
+                  
+                ],
+
+              });
+  
+                }else{
+                renderer = new ClassBreaksRenderer({
+                  type: "class-breaks",
+                  // attribute of interest - Earthquake magnitude
+                  field: statsField,
+                  classBreakInfos: [
+                    {
+                      minValue: 0,  // 0 acres
+                      maxValue:0,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: "#a2a4a6"},
+                      label: "0"  
+                    },
+                    {
+                      minValue: min + 1,  // 0 acres
+                      maxValue: max/4,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: layerColors[3]},  // will be assigned sym1
+                      label: `${min + 1} - ${max/4}`
+                    },
+                    {
+                      minValue: max/4 + 1,  // 0 acres
+                      maxValue: max/4*2,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: layerColors[2]},  // will be assigned sym1
+                      label: `${max/4 + 1} - ${max/4*2}`
+                    },
+                    {
+                      minValue: max/4 *2+ 1,  // 0 acres
+                      maxValue: max/4*3,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: layerColors[1]},  // will be assigned sym1
+                      label: `${max/4*2 + 1} - ${max/4*3}`
+                    },
+                    {
+                      minValue: max/4 *3+ 1,  // 0 acres
+                      maxValue: max,  // 200,000 acres
+                      symbol: { type: "simple-fill", color: layerColors[0]},  // will be assigned sym1
+                      label: `${max/4*3 + 1} - ${max}`
+                    },
+                    
+                  ],
+  
+                });
+              }
+  
+  
+            census_data_layer.renderer = renderer;
+
+            var popupTemplate = {
+                // autocasts as new PopupTemplate()
+                title: `{census.census.${this.selectedTable.name}.geo_name}`,
+                content: this.populationChange,
+                outFields: ["*"],
+                
+              }
+            census_data_layer.popupTemplate = popupTemplate;
+          
+        },
+
 
         async makeGeometry(){
           var geometry = new MapImageLayer({
@@ -194,6 +421,61 @@ export default {
 
                 return attributes
         },
+
+        makeLayer(){
+          // if (geo_name.includes("COUNTIES")){
+          //   var plus_def = `AND geo_name LIKE '%County%'`
+          // }else{
+          //   var plus_def = ''
+          // }
+          console.log(this.selectedYear)
+          console.log(this.selectedField)
+          console.log(this.selectedGeoUnit)
+          console.log(this.selectedTable)
+          console.log(`census.census.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `)
+          // var statsField = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
+          return new MapImageLayer({
+            url: baseurl,
+            title: this.selectedField.alias,
+            definitionExpression : `census.census.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `,
+            sublayers: [
+              {
+                title: "Census Data",
+                id: 0,
+                opacity: 0.75,
+                            
+                source: {
+                  // indicates the source of the sublayer is a dynamic data layer
+                  type: "data-layer",
+                  // this object defines the data source of the layer
+                  // in this case it's a joined table
+                  dataSource: {
+                    type: "join-table",
+                    leftTableSource: {
+                      type: "map-layer",
+                      mapLayerId: this.selectedGeoUnit.id
+                    },
+                    rightTableSource: {
+                      type: "data-layer",
+                      dataSource: {
+                        type: "table",
+                        workspaceId: "nc_census_app",
+                        dataSourceName: this.selectedTable.name
+                      }
+                    },
+                    leftTableKey: "geoid",
+                    rightTableKey: "geo_id",
+                    joinType: "left-inner-join"
+                  }
+                },
+              }
+            ]
+            });
+
+
+
+        },
+
        async renderAttributes(){
 
 
@@ -286,7 +568,8 @@ export default {
             Counties: null,
             tableOptions: {},
             layerOptions: {},
-            uniqueValueInfos: []
+            uniqueValueInfos: [],
+            normalizationField: null
         }
     }
 }

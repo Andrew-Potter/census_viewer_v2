@@ -17,6 +17,7 @@ import Sidebar from 'primevue/sidebar';
 import Panel from "primevue/panel"
 import Card from "primevue/card"
 import Dialog from 'primevue/dialog';
+import Checkbox from 'primevue/checkbox'
 
 Vue.use(PrimeVue)
 
@@ -29,6 +30,7 @@ Vue.component("Sidebar", Sidebar)
 Vue.component("Panel", Panel)
 Vue.component("Card", Card)
 Vue.component("Dialog", Dialog)
+Vue.component("Checkbox", Checkbox)
 
 
 Vue.config.productionTip = false
