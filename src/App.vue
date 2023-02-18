@@ -6,7 +6,7 @@
               <Dialog header="Filters " :visible.sync="filtersOpen" :containerStyle="{width: '50vw'}">
                 <Panel style="height:100vh; text-align: left;">
                   <Dropdown v-model="selectedGeometry" :options="geometries" optionLabel="alias" placeholder="Select a Geometry" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
-                  <Dropdown v-model="selectedSubjectArea" :options="subjectAreas" optionLabel="subject_area" placeholder="Select a Subject Area" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
+                  <Dropdown v-model="selectedSubjectArea" :options="subjectAreas" optionLabel="SUBJECT_AREA" placeholder="Select a Subject Area" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
                   <Dropdown v-model="selectedTable" :options="filteredTables" optionLabel="displayNameShort" placeholder="Select a Table" dataKey="id" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
                   <Dropdown v-model="selectedField" :options="filteredFields" optionLabel="aliasShort" placeholder="Select a Field" dataKey="id" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
                   <Dropdown v-model="selectedNormField" :options="filteredFields" optionLabel="aliasShort" placeholder="Select a Normalization Field" dataKey="id" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
@@ -83,17 +83,20 @@ export default {
     },
     async generateOptions(){
       let tableResp = await esriRequest(this.baseurl+this.tableLookupIndex+"/query", {query:{f: "json", where:`1=1`, outFields:"*"}, responseType: "json"})
+      console.log(tableResp);
           tableResp.data.features.forEach(t =>{
-            this.tableLookup[t.attributes.table_id] = t.attributes;
+            this.tableLookup[t.attributes.TABLE_ID] = t.attributes;
 
           })
 
           let geomLookupResp = await esriRequest(this.baseurl+this.geometryLookupIndex+"/query", {query:{f: "json", where:"1=1", outFields:"*"}, responseType: "json"})
+          console.log(geomLookupResp)
           geomLookupResp.data.features.forEach(t =>{
-            if (!Object.keys(this.geometryLookup).includes(t.attributes.geometry_level)){
-              this.geometryLookup[t.attributes.geometry_level] = {tables:{}}
+            let geometryLevel = t.attributes.Geometry_Level.toUpperCase();
+            if (!Object.keys(this.geometryLookup).includes(geometryLevel)){
+              this.geometryLookup[geometryLevel] = {tables:{}}
             }
-            this.geometryLookup[t.attributes.geometry_level].tables[t.attributes.table_id]=t.attributes;
+            this.geometryLookup[geometryLevel].tables[t.attributes.Table_ID]=t.attributes;
 
           })
 
@@ -120,15 +123,16 @@ export default {
           resp.data.tables.forEach(table =>{
 
             console.log(table)
-
-            if (!["FieldsLookUp", "GeometryReference", "TableLookUp"].includes(table.name)){
+            var table_name = table.name.split(".").at(-1)
+            if (!["FIELDSLOOKUP", "GEOMETRYREFERENCE", "TABLELOOKUP"].includes(table_name)){
               this.tables.push(
+                
                 {
-                  alias: table.name, 
-                  name: table.name, id: table.id, 
-                  displayName: this.tableLookup[table.name].table_title,
-                  displayNameShort: this.tableLookup[table.name].table_title.slice(0,100),
-                  subjectArea: this.tableLookup[table.name].subject_area
+                  alias: table_name, 
+                  name: table_name, id: table.id, 
+                  displayName: this.tableLookup[table_name].TABLE_TITLE,
+                  displayNameShort: this.tableLookup[table_name].TABLE_TITLE.slice(0,100),
+                  subjectArea: this.tableLookup[table_name].SUBJECT_AREA
                 }
               )
             }
@@ -141,21 +145,24 @@ export default {
   watch:{
     async selectedSubjectArea(){
       let filtered_tables = []
+      console.log(this.selectedGeometry)
       if(this.selectedGeometry==null){
         return []
       }
       if (this.selectedGeometry.alias == null){
         return []
       }
+      
       if (this.geometryLookup[this.selectedGeometry.alias] == null){
         return []
       }
       
       let keys = Object.keys(this.geometryLookup[this.selectedGeometry.alias].tables)
       console.log(this.geometryLookup[this.selectedGeometry.alias])
+      console.log(keys);
       this.tables.forEach(t =>{
 
-        if (keys.includes(t.alias) & t.subjectArea == this.selectedSubjectArea.subject_area){
+        if (keys.includes(t.alias) & t.subjectArea == this.selectedSubjectArea.SUBJECT_AREA){
 
           filtered_tables.push(t)
         }
@@ -192,25 +199,25 @@ export default {
       this.filteredFields = [];
       // console.log(this.selected)
       // console.log(this.selectedTable.alias)
-      let fields = this.geometryLookup[this.selectedGeometry.alias].tables[this.selectedTable.alias].fields.split("|")
+      let fields = this.geometryLookup[this.selectedGeometry.alias].tables[this.selectedTable.alias].Fields.split("|")
       fields.forEach(f=>{
         filteredFields.push(f.toUpperCase());
       })
-      let fieldsLookupResp = await esriRequest(this.baseurl+this.fieldLookupIndex+"/query", {query:{f: "json", where:`FIELD_ID in ('${filteredFields.join("', '")}')`, outFields:"*"}, responseType: "json"})
-      let checkDups = []
-      let fieldYears = {}
+      var fieldsLookupResp = await esriRequest(this.baseurl+this.fieldLookupIndex+"/query", {query:{f: "json", where:`FIELD_ID in ('${filteredFields.join("', '")}')`, outFields:"*"}, responseType: "json"})
+      var checkDups = []
+      var fieldYears = {}
       fieldsLookupResp.data.features.forEach(f=>{
-        if(!Object.keys(fieldYears).includes(f.attributes.field_id)){
-          fieldYears[f.attributes.field_id] = []
+        if(!Object.keys(fieldYears).includes(f.attributes.FIELD_ID)){
+          fieldYears[f.attributes.FIELD_ID] = []
         }  
-        if(this.geometryLookup[this.selectedGeometry.alias].tables[this.selectedTable.alias].years.includes(f.attributes.year)){
-          fieldYears[f.attributes.field_id].push(f.attributes.year)
+        if(this.geometryLookup[this.selectedGeometry.alias].tables[this.selectedTable.alias].Years.includes(f.attributes.YEAR)){
+          fieldYears[f.attributes.FIELD_ID].push(f.attributes.YEAR)
         }      
-        if (!checkDups.includes(f.attributes.field_id)){
-          checkDups.push(f.attributes.field_id)
-          let alias  = f.attributes.field_alias.split("|").at(-1)
+        if (!checkDups.includes(f.attributes.FIELD_ID)){
+          checkDups.push(f.attributes.FIELD_ID)
+          let alias  = f.attributes.FIELD_ALIAS.split("|").at(-1)
           console.log(alias)
-          this.filteredFields.push({id: f.attributes.field_id, alias:alias, aliasShort: alias.slice(0,100), years: fieldYears[f.attributes.field_id]})
+          this.filteredFields.push({id: f.attributes.FIELD_ID, alias:alias, aliasShort: alias.slice(0,100), years: fieldYears[f.attributes.FIELD_ID]})
         }
       })
     },
@@ -226,7 +233,7 @@ export default {
   
   data(){
         return{
-            baseurl: "https://vm16-78.vclgis.cnr.ncsu.edu/arcgis/rest/services/US_Census/nc_census_app/MapServer/",
+            baseurl: "https://ncdotsandbox.cnr.ncsu.edu/arcgis/rest/services/DemographicApp/DemographicAppWMS/MapServer/",
             showcharts:false,
             barChartData: null,
             basicOptions: null,
@@ -236,16 +243,16 @@ export default {
             tables: [],
             selectedGeometry:null,
             selectedTable:null,
-            tableLookupIndex: 166,
+            tableLookupIndex: 157,
             tableLookup:{},
             filtersOpen: false,
             subjectAreas: [],
             selectedSubjectArea:null,
-            geometryLookupIndex: 167,
+            geometryLookupIndex: 156,
             geometryLookup: {},
             filteredFields: [],
             selectedField: null,
-            fieldLookupIndex: 165,
+            fieldLookupIndex: 155,
             years: [],
             selectedYear: null,
             runQuery:false,

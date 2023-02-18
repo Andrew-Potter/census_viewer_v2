@@ -19,11 +19,12 @@ import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
 import UniqueValueRenderer from "@arcgis/core/renderers/UniqueValueRenderer"
 import Legend from "@arcgis/core/widgets/Legend"
 import esriRequest from "@arcgis/core/request"
+// import StatisticDefinition from "@arcgis/core/rest/support/StatisticDefinition"
 // import LayerList from "@arcgis/core/widgets/LayerList"
 
 // import esriRequest from "@arcgis/core/request"
 
-var baseurl = "https://vm16-78.vclgis.cnr.ncsu.edu/arcgis/rest/services/US_Census/nc_census_app/MapServer/"
+var baseurl = "https://ncdotsandbox.cnr.ncsu.edu/arcgis/rest/services/DemographicApp/DemographicAppWMS/MapServer/"
 
 
 export default {
@@ -95,8 +96,8 @@ export default {
               this.queryGeoLayers(selectedGeoId);
               // queryGeoLayers(selectedGeoId);
               // selectFeatures(feature.graphic.geometry.centroid, chart, false)
-              var fieldName = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
-              var normFieldName = `census.census.${this.selectedTable.name}.${this.selectedNormField.id.toLowerCase()}`
+              var fieldName = `dbo.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
+              var normFieldName = `dbo.${this.selectedTable.name}.${this.selectedNormField.id.toLowerCase()}`
               let proportion = feature.graphic.attributes[fieldName] / feature.graphic.attributes[normFieldName] 
               let percent = proportion * 100
 
@@ -104,7 +105,7 @@ export default {
                 `${this.selectedField.alias}: ${feature.graphic.attributes[fieldName]} <br>
                 Total Population: ${feature.graphic.attributes[normFieldName]} <br>
                 Percent: ${percent.toFixed(2)}<br>
-                Year: ${new Date(feature.graphic.attributes[`census.census.${this.selectedTable.name}.year`]).getFullYear() + 1}
+                Year: ${new Date(feature.graphic.attributes[`dbo.${this.selectedTable.name}.year`]).getFullYear() + 1}
                 `
               console.log(div.innerHTML);
               this.view.popup.highlightEnabled = true
@@ -179,38 +180,30 @@ export default {
               return sublayer.title === "Census Data";
             });
             console.log(census_data_layer)
-            census_data_layer.definitionExpression =  `census.census.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `
-            var statsField = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
-            console.log(statsField)
-            var fieldMax = {
-              onStatisticField: statsField,  // service field for 2015 population
-              outStatisticFieldName: "fieldmax",
-              statisticType: "max"
-            };
-  
-            var fieldMin = {
-              onStatisticField: statsField,  // service field for 2015 population
-              outStatisticFieldName: "fieldmin",
-              statisticType: "min"
-            };
-  
-            var max
-            var min
-  
+            // census_data_layer.definitionExpression =  `NCDOT_Demographics.DBO.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `
+            var statsField = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedField.id}`
+            var res = await census_data_layer.queryFeatures({where:'1=1', outFields:[statsField]});
+            console.log(res);
+            var resultsArray = [];
+            res.features.forEach(f => {
+              resultsArray.push(f.attributes[statsField])
+            })
+
+            var max = Math.max(...resultsArray);
+            var min = Math.min(...resultsArray);
+            console.log(resultsArray);
+            
+ 
                
             const layerColors = ["#910000", "#c33910", "#f6711f", "#fbaf52", "#ffed85"];
-            var query = census_data_layer.createQuery();
-            query.outStatistics = [fieldMax, fieldMin]
-            var response = await census_data_layer.queryFeatures(query)
+            // var query = census_data_layer.createQuery();
+            // query.outStatistics = [fieldMax, fieldMin]
+            // var response = await census_data_layer.queryFeatures(query)
 
-            console.log(response)
-              
-            var stats = response.features[0].attributes;
-            max = stats.fieldmax
-            min = stats.fieldmin
+           
             var renderer;
             if (this.normalize){
-                var normField = `census.census.${this.selectedTable.name}.${this.selectedNormField.id.toLowerCase()}`
+                var normField = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedNormField.id}`
                 renderer = new ClassBreaksRenderer({
                 type: "class-breaks",
                 // attribute of interest - Earthquake magnitude
@@ -299,7 +292,7 @@ export default {
 
             var popupTemplate = {
                 // autocasts as new PopupTemplate()
-                title: `{census.census.${this.selectedTable.name}.geo_name}`,
+                title: `{NCDOT_Demographics.DBO.${this.selectedTable.name}.geo_name}`,
                 content: this.populationChange,
                 outFields: ["*"],
                 
@@ -432,12 +425,12 @@ export default {
           console.log(this.selectedField)
           console.log(this.selectedGeoUnit)
           console.log(this.selectedTable)
-          console.log(`census.census.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `)
+          console.log(`dbo.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `)
           // var statsField = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
           return new MapImageLayer({
             url: baseurl,
             title: this.selectedField.alias,
-            definitionExpression : `census.census.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `,
+            definitionExpression : `NCDOT_Demographics.DBO.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `,
             sublayers: [
               {
                 title: "Census Data",
@@ -459,11 +452,11 @@ export default {
                       type: "data-layer",
                       dataSource: {
                         type: "table",
-                        workspaceId: "nc_census_app",
-                        dataSourceName: this.selectedTable.name
+                        workspaceId: "5332",
+                        dataSourceName: `NCDOT_Demographics.DBO.${this.selectedTable.name}`
                       }
                     },
-                    leftTableKey: "geoid",
+                    leftTableKey: "GEOID",
                     rightTableKey: "geo_id",
                     joinType: "left-inner-join"
                   }
