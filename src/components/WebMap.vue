@@ -19,6 +19,8 @@ import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
 import UniqueValueRenderer from "@arcgis/core/renderers/UniqueValueRenderer"
 import Legend from "@arcgis/core/widgets/Legend"
 import esriRequest from "@arcgis/core/request"
+import "flex-splitter-directive"
+import "flex-splitter-directive/styles.min.css"
 // import StatisticDefinition from "@arcgis/core/rest/support/StatisticDefinition"
 // import LayerList from "@arcgis/core/widgets/LayerList"
 
@@ -35,7 +37,7 @@ export default {
       selectedTable: Object,
       selectedField: Object,
       selectedNormField: Object,
-      selectedYear: String, 
+      selectedYear: Object, 
       normalize: Boolean,
       runQuery: Boolean
     },
@@ -202,7 +204,7 @@ export default {
 
            
             var renderer;
-            if (this.normalize){
+            if (this.selectedNormField){
                 var normField = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedNormField.id}`
                 renderer = new ClassBreaksRenderer({
                 type: "class-breaks",
@@ -286,8 +288,10 @@ export default {
   
                 });
               }
-  
-  
+            
+
+            console.log(renderer)
+              
             census_data_layer.renderer = renderer;
 
             var popupTemplate = {
@@ -360,11 +364,11 @@ export default {
                 let geo_name = queryGeoName.join("")
                 let res;
                 let features=[];
-                res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear}-1-1' AND geo_unit = '${geo_name}'`, outFields:["geo_id", this.selectedField.id]})
+                res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear.alias}-1-1' AND geo_unit = '${geo_name}'`, outFields:["geo_id", this.selectedField.id]})
                 console.log(res)
                 if (res.features.length === 0){
                   console.log("here")
-                  res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear}-1-1'`, outFields:["geo_id", this.selectedField.id]})
+                  res = await this.table.queryFeatures({where: `year = DATE '${this.selectedYear.alias}-1-1'`, outFields:["geo_id", this.selectedField.id]})
                   if (geo_name.includes("Counties")){
                     res.features.forEach(feature =>{
                       if (feature.attributes.geo_id.length ===5){
@@ -429,8 +433,8 @@ export default {
           // var statsField = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
           return new MapImageLayer({
             url: baseurl,
-            title: this.selectedField.alias,
-            definitionExpression : `NCDOT_Demographics.DBO.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `,
+            title: this.selectedField.aliasLong,
+            definitionExpression : `NCDOT_Demographics.DBO.${this.selectedTable.name}.year = date'1/1/${this.selectedYear.alias}' `,
             sublayers: [
               {
                 title: "Census Data",

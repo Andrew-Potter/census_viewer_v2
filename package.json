@@ -10,10 +10,10 @@
     "watch": "vue-cli-service build --watch --mode development"
   },
   "dependencies": {
-    "@arcgis/core": "4.21.2",
+    "@arcgis/core": "^4.22.2",
     "chart.js": "^3.9.1",
     "core-js": "^3.6.5",
-    "flex-splitter-directive": "^0.4.0",
+    "flex-splitter-directive": "^0.2.0",
     "primeflex": "^3.2.1",
     "primeicons": "^5.0.0",
     "primevue": "^2.9.2",

@@ -1,7 +1,13 @@
 <template>
   <div>
-    <Toolbar>
+    <Toolbar style="10 vh">
+      <!-- <ToggleButton onLabel="Query Data" offLabel="QueryData" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_filters" /> -->
+
             <template #start>
+              <ToggleButton onLabel="Query Data" offLabel="Query Data" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_filters" />
+              <ToggleButton onLabel="Show Charts" offLabel="Show Charts" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_charts" />
+
+
               <Button label="Filters" icon="pi pi-filter-fill" @click="openFilters" />
               <Dialog header="Filters " :visible.sync="filtersOpen" :containerStyle="{width: '50vw'}">
                 <Panel style="height:100vh; text-align: left;">
@@ -45,39 +51,54 @@
                 <Button icon="pi pi-times" class="p-button-danger" /> -->
             </template>
     </Toolbar>
-    <div style="height: 90vh">
-      <Map @selectPolys="selectPolysHandler($event)" :selectedGeoUnit="selectedGeometry" :selectedSubjectArea="selectedSubjectArea" :selectedTable="selectedTable" :selectedField="selectedField" :selectedYear="selectedYear" :runQuery="runQuery" :selectedNormField="selectedNormField" :normalize="normalize"></Map>
-      <Sidebar :visible.sync="showmenu" :baseZIndex="1000" position="right" :modal=false  style="height:100vh">
-                <!-- <Panel style="height:100vh">
-                  <Dropdown v-model="selectedGeometry" :options="geometries" optionLabel="alias" placeholder="Select a Geometry" style="min-width:200px"/>
-                  <Dropdown v-model="selectedTable" :options="tables" optionLabel="displayName" placeholder="Select a Table" style="min-width:200px"/>
+    <div data-flex-splitter-horizontal style="flex: auto; height:90vh">
+      <div style="width:30%">
+        <Panel style="height:100vh; text-align: left; width:100%;">
+          <FilterItem filter_name="Geometry" filter_title="Geometry" :options="geometries" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
+          <FilterItem filter_name="SubjectArea" filter_title="Subject Area" :options="subjectAreas" display_field="alias"  @selectedOption="selectedOptionHandler($event)"/>
+          <FilterItem filter_name="Table" filter_title="Table" :options="filteredTables" display_field="displayNameShort" @selectedOption="selectedOptionHandler($event)"/>
+          <FilterItem filter_name="Field" filter_title="Field" :options="filteredFields" display_field="aliasLong" @selectedOption="selectedOptionHandler($event)"/>
+          <FilterItem filter_name="NormField" filter_title="Normalization Field" :options="filteredFields" display_field="aliasLong" @selectedOption="selectedOptionHandler($event)"/>
+          <FilterItem filter_name="Year" filter_title="Year" :options="years" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
 
-                </Panel> -->
+          <Button label="Run Query" icon="pi pi-run" @click="(runQuery = !runQuery);(filtersOpen = false)" />
 
-    </Sidebar>
+        </Panel>
+      </div>
+      <div role="separator"></div>
+      <div style="flex-grow: 1">
+        <Map @selectPolys="selectPolysHandler($event)" :selectedGeoUnit="selectedGeometry" :selectedSubjectArea="selectedSubjectArea" :selectedTable="selectedTable" :selectedField="selectedField" :selectedYear="selectedYear" :runQuery="runQuery" :selectedNormField="selectedNormField" :normalize="normalize"></Map>
+      </div>
     </div>
-   
-
-
-
  </div>
     
 </template>
 
+
 <script>
+import "flex-splitter-directive"
+import "flex-splitter-directive/styles.min.css"
 import Map from "./components/WebMap.vue"
 import esriRequest from "@arcgis/core/request"
+import FilterItem from "./components/FilterItem.vue"
 
 export default {
   name: 'App',
   components: {
-    Map
+    Map,
+    FilterItem
   },
   async mounted(){
     this.generateOptions();
     
   },
   methods:{
+    selectedOptionHandler(event)
+      {
+        this.$data[`selected${event.filter_name}`]=event.selectedOption;
+        console.log(this.selectedGeometry)
+      }
+    ,
     openFilters(){
       this.filtersOpen = true;
     },
@@ -116,8 +137,10 @@ export default {
             };
           var subjectAreasResp = await esriRequest( this.baseurl+this.tableLookupIndex+"/query", options)
           console.log(subjectAreasResp)
+          let i = 0;
           subjectAreasResp.data.features.forEach(s =>{
-            this.subjectAreas.push(s.attributes)
+            this.subjectAreas.push({alias: s.attributes.SUBJECT_AREA, id:i, name:s.attributes.SUBJECT_AREA})
+            i+=1;
           })
           console.log(this.tableLookup)
           resp.data.tables.forEach(table =>{
@@ -149,7 +172,7 @@ export default {
       if(this.selectedGeometry==null){
         return []
       }
-      if (this.selectedGeometry.alias == null){
+      if (this.selectedGeometry == null){
         return []
       }
       
@@ -161,8 +184,7 @@ export default {
       console.log(this.geometryLookup[this.selectedGeometry.alias])
       console.log(keys);
       this.tables.forEach(t =>{
-
-        if (keys.includes(t.alias) & t.subjectArea == this.selectedSubjectArea.SUBJECT_AREA){
+        if (keys.includes(t.alias) & t.subjectArea == this.selectedSubjectArea.alias){
 
           filtered_tables.push(t)
         }
@@ -199,7 +221,7 @@ export default {
       this.filteredFields = [];
       // console.log(this.selected)
       // console.log(this.selectedTable.alias)
-      let fields = this.geometryLookup[this.selectedGeometry.alias].tables[this.selectedTable.alias].Fields.split("|")
+      let fields = this.geometryLookup[this.selectedGeometry.alias].tables[this.selectedTable.name].Fields.split("|")
       fields.forEach(f=>{
         filteredFields.push(f.toUpperCase());
       })
@@ -210,19 +232,23 @@ export default {
         if(!Object.keys(fieldYears).includes(f.attributes.FIELD_ID)){
           fieldYears[f.attributes.FIELD_ID] = []
         }  
-        if(this.geometryLookup[this.selectedGeometry.alias].tables[this.selectedTable.alias].Years.includes(f.attributes.YEAR)){
+        if(this.geometryLookup[this.selectedGeometry.alias].tables[this.selectedTable.name].Years.includes(f.attributes.YEAR)){
           fieldYears[f.attributes.FIELD_ID].push(f.attributes.YEAR)
         }      
         if (!checkDups.includes(f.attributes.FIELD_ID)){
           checkDups.push(f.attributes.FIELD_ID)
           let alias  = f.attributes.FIELD_ALIAS.split("|").at(-1)
+          let aliasLong = f.attributes.FIELD_ALIAS.split("|").slice(1,f.attributes.FIELD_ALIAS.length).join("|")
           console.log(alias)
-          this.filteredFields.push({id: f.attributes.FIELD_ID, alias:alias, aliasShort: alias.slice(0,100), years: fieldYears[f.attributes.FIELD_ID]})
+          this.filteredFields.push({id: f.attributes.FIELD_ID,aliasLong: aliasLong, alias:alias, aliasShort: alias.slice(0,100), years: fieldYears[f.attributes.FIELD_ID]})
         }
       })
+      console.log(this.filteredFields)
     },
     async selectedField(){
-      this.years = this.selectedField.years;
+      var years = []
+      this.selectedField.years.forEach(y=> years.push({alias: y}))
+      this.years = years;
     }
 
   },
@@ -259,7 +285,9 @@ export default {
             filteredTables: [],
             totalField: null,
             selectedNormField: null,
-            normalize: false
+            normalize: false,
+            show_filters: true,
+            show_charts: false
 
 
 
