@@ -58,7 +58,6 @@ import "flex-splitter-directive/styles.min.css"
 import Map from "./components/WebMap.vue"
 import esriRequest from "@arcgis/core/request"
 import FilterItem from "./components/FilterItem.vue"
-import Expand from "@arcgis/core/widgets/Expand"
 
 export default {
   name: 'App',
