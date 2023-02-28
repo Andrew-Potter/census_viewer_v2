@@ -2,6 +2,20 @@
     
 
     <div class="mapview" style="height: 100%; width:100%;">
+      <div
+            id="select-by-polygon"
+            class="esri-widget esri-widget--button esri-widget esri-interactive"
+            title="Select features by rectangle"
+            @click="polygonSelection">
+          <span class="esri-icon-checkbox-unchecked"></span>
+      </div>
+      <div
+            id="select-by-point"
+            class="esri-widget esri-widget--button esri-widget esri-interactive"
+            title="Select features by point">
+          <span class="esri-icon-map-pin"></span>
+      </div>
+      
 
     </div>
 
@@ -19,6 +33,9 @@ import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
 import UniqueValueRenderer from "@arcgis/core/renderers/UniqueValueRenderer"
 import Legend from "@arcgis/core/widgets/Legend"
 import esriRequest from "@arcgis/core/request"
+import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer"
+import SketchViewModel from "@arcgis/core/widgets/Sketch/SketchViewModel"
+
 import "flex-splitter-directive"
 import "flex-splitter-directive/styles.min.css"
 // import StatisticDefinition from "@arcgis/core/rest/support/StatisticDefinition"
@@ -52,6 +69,11 @@ export default {
         await this.loadMap()
     },
     methods:{
+        async polygonSelection(){
+          this.view.graphics.removeAll();
+          this.sketchViewModel.create("polygon")
+
+        },
         async executeQuery(){
           this.geometry = this.makeLayer()
           this.map.layers = [this.geometry]
@@ -84,6 +106,27 @@ export default {
               view: this.view,
             });
           this.view.ui.add(legend, "bottom-right");
+          this.view.ui.add("select-by-polygon", "top-right");
+          this.view.ui.add("select-by-point", "top-right");
+
+          this.polygonGraphicsLayer = new GraphicsLayer();
+          this.map.add(this.polygonGraphicsLayer);
+          this.sketchViewModel = new SketchViewModel({
+            view: this.view,
+            layer: this.polygonGraphicsLayer,
+            pointSymbol: {
+              type: "simple-marker",
+              style: "circle",
+              color: "black",
+              size: "6",
+              outline: {
+                color: "black",
+                width: 1
+              }
+            }
+          });
+
+
           // let layerlist = new LayerList({
           //   view: this.view
           // });
@@ -566,7 +609,9 @@ export default {
             tableOptions: {},
             layerOptions: {},
             uniqueValueInfos: [],
-            normalizationField: null
+            normalizationField: null,
+            sketchViewModel: null,
+            polygonGraphicsLayer: null
         }
     }
 }

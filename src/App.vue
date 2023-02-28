@@ -6,32 +6,6 @@
             <template #start>
               <ToggleButton onLabel="Query Data" offLabel="Query Data" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_filters" />
               <ToggleButton onLabel="Show Charts" offLabel="Show Charts" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_charts" />
-
-
-              <Button label="Filters" icon="pi pi-filter-fill" @click="openFilters" />
-              <Dialog header="Filters " :visible.sync="filtersOpen" :containerStyle="{width: '50vw'}">
-                <Panel style="height:100vh; text-align: left;">
-                  <Dropdown v-model="selectedGeometry" :options="geometries" optionLabel="alias" placeholder="Select a Geometry" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
-                  <Dropdown v-model="selectedSubjectArea" :options="subjectAreas" optionLabel="SUBJECT_AREA" placeholder="Select a Subject Area" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
-                  <Dropdown v-model="selectedTable" :options="filteredTables" optionLabel="displayNameShort" placeholder="Select a Table" dataKey="id" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
-                  <Dropdown v-model="selectedField" :options="filteredFields" optionLabel="aliasShort" placeholder="Select a Field" dataKey="id" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
-                  <Dropdown v-model="selectedNormField" :options="filteredFields" optionLabel="aliasShort" placeholder="Select a Normalization Field" dataKey="id" :filter="true" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
-                  <Dropdown v-model="selectedYear" :options="years"  placeholder="Select a Year" style="min-width:200px; max-width:90vw; text-align: left;"/><br>
-                  <Checkbox v-model="normalize" :binary="true" id="norm"></Checkbox>&nbsp;&nbsp;
-                  <label for="norm">Normalize?</label><br>
-                  <Button label="Run Query" icon="pi pi-run" @click="(runQuery = !runQuery);(filtersOpen = false)" />
-
-                </Panel>
-                <!-- <template #footer>
-                    <Button label="No" icon="pi pi-times" @click="closeBasic" class="p-button-text"/>
-                    <Button label="Yes" icon="pi pi-check" @click="closeBasic" autofocus />
-                </template> -->
-            </Dialog>
-              
-              <!-- <ToggleButton  onLabel="Hide Filters" offLabel="Show Filters" v-model="showfilters"  /> -->
-                <!-- <Button label="New" icon="pi pi-plus" class="mr-2" />
-                <Button label="Upload" icon="pi pi-upload" class="p-button-success" />
-                <i class="pi pi-bars p-toolbar-separator mr-2" /> -->
                
                 <b style="text-align: center; font-size: large;">
                   NCDOT Demographic Mapping and Analysis Application
@@ -52,18 +26,21 @@
             </template>
     </Toolbar>
     <div data-flex-splitter-horizontal style="flex: auto; height:90vh">
-      <div style="width:30%">
-        <Panel style="height:100vh; text-align: left; width:100%;">
-          <FilterItem filter_name="Geometry" filter_title="Geometry" :options="geometries" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
-          <FilterItem filter_name="SubjectArea" filter_title="Subject Area" :options="subjectAreas" display_field="alias"  @selectedOption="selectedOptionHandler($event)"/>
-          <FilterItem filter_name="Table" filter_title="Table" :options="filteredTables" display_field="displayNameShort" @selectedOption="selectedOptionHandler($event)"/>
-          <FilterItem filter_name="Field" filter_title="Field" :options="filteredFields" display_field="aliasLong" @selectedOption="selectedOptionHandler($event)"/>
-          <FilterItem filter_name="NormField" filter_title="Normalization Field" :options="filteredFields" display_field="aliasLong" @selectedOption="selectedOptionHandler($event)"/>
-          <FilterItem filter_name="Year" filter_title="Year" :options="years" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
+      <div style="width:30%" v-if="show_filters">
+        <Card style="height:100vh; text-align: left; width:100%;">
+          <template #content>
+            <FilterItem filter_name="Geometry" filter_title="Geometry" :options="geometries" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
+            <FilterItem filter_name="SubjectArea" filter_title="Subject Area" :options="subjectAreas" display_field="alias"  @selectedOption="selectedOptionHandler($event)"/>
+            <FilterItem filter_name="Table" filter_title="Table" :options="filteredTables" display_field="displayNameShort" @selectedOption="selectedOptionHandler($event)"/>
+            <FilterItem filter_name="Field" filter_title="Field" :options="filteredFields" display_field="aliasLong" @selectedOption="selectedOptionHandler($event)"/>
+            <FilterItem filter_name="NormField" filter_title="Normalization Field" :options="filteredFields" display_field="aliasLong" @selectedOption="selectedOptionHandler($event)"/>
+            <FilterItem filter_name="Year" filter_title="Year" :options="years" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
+          </template>
+          <template #footer>
+            <Button label="Run Query" icon="pi pi-run" @click="(runQuery = !runQuery);(filtersOpen = false)" style="margin-left: 40%;"/>
+        </template>
 
-          <Button label="Run Query" icon="pi pi-run" @click="(runQuery = !runQuery);(filtersOpen = false)" />
-
-        </Panel>
+      </Card>
       </div>
       <div role="separator"></div>
       <div style="flex-grow: 1">
@@ -81,6 +58,7 @@ import "flex-splitter-directive/styles.min.css"
 import Map from "./components/WebMap.vue"
 import esriRequest from "@arcgis/core/request"
 import FilterItem from "./components/FilterItem.vue"
+import Expand from "@arcgis/core/widgets/Expand"
 
 export default {
   name: 'App',
