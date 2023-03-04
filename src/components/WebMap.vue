@@ -1,23 +1,24 @@
 <template>
     
+      <div class="mapview" style="height: 100%; width:100%;">
+        <div
+              id="select-by-polygon"
+              class="esri-widget esri-widget--button esri-widget esri-interactive"
+              title="Select features by rectangle"
+              @click="polygonSelection">
+            <span class="esri-icon-checkbox-unchecked"></span>
+        </div>
+        <div
+              id="select-by-point"
+              class="esri-widget esri-widget--button esri-widget esri-interactive"
+              title="Select features by point">
+            <span class="esri-icon-map-pin"></span>
+        </div>
+        
 
-    <div class="mapview" style="height: 100%; width:100%;">
-      <div
-            id="select-by-polygon"
-            class="esri-widget esri-widget--button esri-widget esri-interactive"
-            title="Select features by rectangle"
-            @click="polygonSelection">
-          <span class="esri-icon-checkbox-unchecked"></span>
       </div>
-      <div
-            id="select-by-point"
-            class="esri-widget esri-widget--button esri-widget esri-interactive"
-            title="Select features by point">
-          <span class="esri-icon-map-pin"></span>
-      </div>
-      
 
-    </div>
+   
 
 
 </template>
@@ -31,6 +32,7 @@ import MapImageLayer from "@arcgis/core/layers/MapImageLayer"
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer"
 import ClassBreaksRenderer from "@arcgis/core/renderers/ClassBreaksRenderer"
 import UniqueValueRenderer from "@arcgis/core/renderers/UniqueValueRenderer"
+// import SimpleRenderer from "@arcgis/core/renderers/SimpleRenderer"
 import Legend from "@arcgis/core/widgets/Legend"
 import esriRequest from "@arcgis/core/request"
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer"
@@ -76,6 +78,8 @@ export default {
         },
         async executeQuery(){
           this.geometry = this.makeLayer()
+          // this.geometry = this.makeLayer()
+          console.log(this.geometry) 
           this.map.layers = [this.geometry]
           this.renderLayer()
           // this.geometry = await this.makeGeometry();
@@ -133,26 +137,50 @@ export default {
           // this.view.ui.add(layerlist, "top-right");
        
         },
-        async populationChange (feature) {
+         populationChange (feature) {
+            var oid_field =`a_${this.selectedGeoUnit.alias}.OBJECTID`
+            var name_field = `a_${this.selectedGeoUnit.alias}.NAME`
+            var this_feature = this.selectedFeaturesData[feature.graphic.attributes[oid_field]]
               var div = document.createElement("div");
+              div.innerHTML = `
+                Name: ${this_feature[name_field]} <br>
+                Year: ${new Date(this_feature[this.yearField]).getFullYear() + 1}<br>
+                GEOID: ${this_feature[this.geo_id_field]} <br>
+              `
+              this.queryGeoLayers(this_feature[this.geo_id_field])
               console.log(feature)
-              // calculate the population percent change from 2010 to 2013.
-              var selectedGeoId = feature.graphic.attributes[`${this.selectedTable.name}.geo_id`]
-              this.queryGeoLayers(selectedGeoId);
-              // queryGeoLayers(selectedGeoId);
-              // selectFeatures(feature.graphic.geometry.centroid, chart, false)
-              var fieldName = `dbo.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
-              var normFieldName = `dbo.${this.selectedTable.name}.${this.selectedNormField.id.toLowerCase()}`
-              let proportion = feature.graphic.attributes[fieldName] / feature.graphic.attributes[normFieldName] 
-              let percent = proportion * 100
-
-              div.innerHTML =
-                `${this.selectedField.alias}: ${feature.graphic.attributes[fieldName]} <br>
-                Total Population: ${feature.graphic.attributes[normFieldName]} <br>
-                Percent: ${percent.toFixed(2)}<br>
-                Year: ${new Date(feature.graphic.attributes[`dbo.${this.selectedTable.name}.year`]).getFullYear() + 1}
-                `
-              console.log(div.innerHTML);
+              // // calculate the population percent change from 2010 to 2013.
+              // var selectedGeoId = feature.graphic.attributes[`NCDOT_Demographics.DBO.${this.selectedTable.name}.geo_id`]
+              // var selectedGeoName = feature.graphic.attributes[`NCDOT_Demographics.DBO.${this.selectedTable.name}.geo_name`]
+              // var year = feature.graphic.attributes[`NCDOT_Demographics.DBO.${this.selectedTable.name}.year`]
+              // this.queryGeoLayers(selectedGeoId);
+              // console.log(new Date(year).getFullYear())
+              // // queryGeoLayers(selectedGeoId);
+              // // selectFeatures(feature.graphic.geometry.centroid, chart, false)
+              // var fieldName = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedField.id}`
+              // if(this.selectedNormField){
+              //   var normFieldName = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedNormField.id}`
+              //   let proportion = feature.graphic.attributes[fieldName] / feature.graphic.attributes[normFieldName] 
+              //   let percent = proportion * 100
+              //   div.innerHTML =
+              //     `
+              //     <b>${selectedGeoName}</b><br>
+              //     ${this.selectedField.alias}: ${feature.graphic.attributes[fieldName]} <br>
+              //     Total Population: ${feature.graphic.attributes[normFieldName]} <br>
+              //     Percent: ${percent.toFixed(2)}<br>
+              //     Year: ${new Date(year).getFullYear() + 1}
+              //     `
+              // }else{
+              //   div.innerHTML =
+              //     `<b>${selectedGeoName}</b><br>
+              //     ${this.selectedField.alias}: ${feature.graphic.attributes[fieldName]} <br>
+              //     Total Population: ${feature.graphic.attributes[fieldName]} <br>
+              //     Year: ${new Date(year).getFullYear() + 1}
+              //     `
+              // }
+              
+              
+              // console.log(div.innerHTML);
               this.view.popup.highlightEnabled = true
               return div;
               
@@ -161,16 +189,16 @@ export default {
         async queryGeoLayers(geoid){
 
           // var tableAlias = this.selectedTable.alias 
-          var geomValue = this.selectedGeoUnit.id
+          var geomValue = this.selectedGeoUnit.alias
           console.log(geomValue)
           var searchGeoms = ["37"]
           var countyId;
-          if (geomValue === 0){
+          if (geomValue === "BLOCKGROUPS"){
             var tractId = geoid.slice(0, -1)
             countyId = geoid.slice(0, -7)
             searchGeoms.push(tractId)
             searchGeoms.push(countyId)
-          } else if (geomValue === 1){
+          } else if (geomValue === "TRACTS"){
             countyId = geoid.slice(0, -6)
             searchGeoms.push(countyId)
           }
@@ -191,7 +219,7 @@ export default {
           }
           response.data.features.forEach(f =>{
             try{
-                if (f.attributes.geo_name in compares[f.attributes.geo_unit] === false){
+                if (f.attributes.geo_ida in compares[f.attributes.geo_unit] === false){
                   compares[f.attributes["geo_unit"]][f.attributes.geo_name] = [f]
                 }else{
                   compares[f.attributes["geo_unit"]][f.attributes.geo_name].push(f)
@@ -220,20 +248,47 @@ export default {
         },
 
         async renderLayer(){
-            
-            var census_data_layer = this.geometry.sublayers.find(function(sublayer) {
+            var census_data_layer = await this.geometry.sublayers.find(function(sublayer) {
               return sublayer.title === "Census Data";
             });
-            console.log(census_data_layer)
-            // census_data_layer.definitionExpression =  `NCDOT_Demographics.DBO.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `
-            var statsField = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedField.id}`
-            var res = await census_data_layer.queryFeatures({where:'1=1', outFields:[statsField]});
-            console.log(res);
+            // var year_field = `NCDOT_Demographics.DBO.${this.selectedTable.name}.year`
+            // census_data_layer.definitionExpression = `year <= date'1/1/2018' or year >= date'1/1/2011'`
+            // var statsField = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedField.id}`
+            var features_data = {}
+            var oid_field = `a_${this.selectedGeoUnit.alias}.OBJECTID`
+            this.oid_field = oid_field
+            var fields = await census_data_layer.queryFeatures({where:`${oid_field} = 1`, outFields: "*", returnGeometry:false})
+            fields = fields.fields;
+            var selected_field = this.selectedField.id
+            var statsField = fields.find(function(field){
+              let this_field = field.name.split(".").at(-1)
+
+              return this_field === selected_field
+            })
+            
+            this.statsField = statsField.name
+            var yearField = fields.find(function(field){
+              let this_field = field.name.split(".").at(-1)
+
+              return this_field === "year"
+            })
+            this.yearField = yearField.name;
+            var geo_id_field = fields.find(function(field){
+              let this_field = field.name.split(".").at(-1)
+
+              return this_field === "geo_id"
+            })
+            this.geo_id_field = geo_id_field.name;
+            // var res = await census_data_layer.queryFeatures({where:'1=1', outFields: [this.statsField, this.yearField, oid_field], returnGeometry: false});
+            var res = await census_data_layer.queryFeatures({where:'1=1', outFields: ["*"], returnGeometry: false});
+
             var resultsArray = [];
             res.features.forEach(f => {
-              resultsArray.push(f.attributes[statsField])
+              features_data[f.attributes[oid_field]] = f.attributes
+                resultsArray.push(f.attributes[this.statsField])
             })
-
+            this.selectedFeaturesData = features_data;
+            console.log(resultsArray)
             var max = Math.max(...resultsArray);
             var min = Math.min(...resultsArray);
             console.log(resultsArray);
@@ -248,7 +303,15 @@ export default {
            
             var renderer;
             if (this.selectedNormField){
-                var normField = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedNormField.id}`
+              var selectedNormField = this.selectedNormField.alias;
+                var normField = res.fields.find(function(field){
+                  let this_field = field.name.split(".").at(-1)
+
+                  return this_field === selectedNormField
+                })
+                normField= normField.name
+                this.normField = normField
+                // var normField = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedNormField.id}`
                 renderer = new ClassBreaksRenderer({
                 type: "class-breaks",
                 // attribute of interest - Earthquake magnitude
@@ -294,7 +357,7 @@ export default {
                 renderer = new ClassBreaksRenderer({
                   type: "class-breaks",
                   // attribute of interest - Earthquake magnitude
-                  field: statsField,
+                  field: this.statsField,
                   classBreakInfos: [
                     {
                       minValue: 0,  // 0 acres
@@ -336,15 +399,22 @@ export default {
             console.log(renderer)
               
             census_data_layer.renderer = renderer;
-
             var popupTemplate = {
                 // autocasts as new PopupTemplate()
-                title: `{NCDOT_Demographics.DBO.${this.selectedTable.name}.geo_name}`,
-                content: this.populationChange,
-                outFields: ["*"],
-                
+                title: `{a_${this.selectedGeoUnit.alias}.NAME}`,
+                content: this.populationChange
               }
-            census_data_layer.popupTemplate = popupTemplate;
+            census_data_layer.popupTemplate = popupTemplate
+            // this.geometry.popupTemplate = popupTemplate
+            // this.map.layers = [this.geometry]
+            // var popupTemplate = {
+            //     // autocasts as new PopupTemplate()
+            //     title: `{NCDOT_Demographics.DBO.${this.selectedTable.name}.geo_name}`,
+            //     content: this.populationChange,
+            //     outFields: ["*"],
+                
+            //   }
+            // census_data_layer.popupTemplate = popupTemplate;
           
         },
 
@@ -462,7 +532,45 @@ export default {
                 return attributes
         },
 
+        joinLayer(){
+          var parent = `NCDOT_Demographics.DBO.${this.selectedGeoUnit.alias}`
+          var child = `NCDOT_Demographics.DBO.${this.selectedTable.alias}`
+
+          var lyr = new MapImageLayer({
+            url: baseurl,
+            title: this.selectedField.aliasLong,
+            
+            sublayers:[{
+              title: "Census Data",
+              id: 0,
+              opacity: 0.75,
+              popupEnabled:true,
+              popupTemplate: {
+                  title: "{NAME}",
+                  content: "{NAME}-{GEOID}--{year}"
+                },
+              
+              source:{
+                type: "data-layer",
+                dataSource:{
+                  type:"query-table",
+                  workspaceId:"5332",
+                  query: `SELECT ${parent}.NAME, ${parent}.OBJECTID, ${parent}.GEOID, ${child}.year  FROM ${parent} JOIN ${child} ON ${parent}.GEOID = ${child}.geo_id where ${child}.year > '2017-1-1'`,
+                  spatialReference: { wkid:4326},
+                  geometryType: "polygon",
+                  oidFields: "OBJECTID"
+                }
+              }
+            }
+            ]
+          });
+
+          return lyr
+
+        },
+
         makeLayer(){
+          // going to have to dump the table into memory, filtering by year, then do the dynamic join
           // if (geo_name.includes("COUNTIES")){
           //   var plus_def = `AND geo_name LIKE '%County%'`
           // }else{
@@ -473,17 +581,28 @@ export default {
           console.log(this.selectedGeoUnit)
           console.log(this.selectedTable)
           console.log(`dbo.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `)
+          var child = `NCDOT_Demographics.DBO.${this.selectedTable.alias}`
+          let statsField = `${child}.${this.selectedField.id}`
+          let oid_field = `${child}.OBJECTID`
+          var normField
+          if (this.selectedNormField){
+            normField = `, ${child}.${this.selectedNormField.id}`
+          }
+          let geo_id_field = `${child}.geo_id`
+          let year_field = `${child}.year`
+
+
           // var statsField = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
-          return new MapImageLayer({
+          var lyr = new MapImageLayer({
             url: baseurl,
             title: this.selectedField.aliasLong,
-            definitionExpression : `NCDOT_Demographics.DBO.${this.selectedTable.name}.year = date'1/1/${this.selectedYear.alias}' `,
             sublayers: [
               {
                 title: "Census Data",
                 id: 0,
                 opacity: 0.75,
-                            
+                // definitionExpression : `NCDOT_Demographics.DBO.${this.selectedTable.name}.year = date'1/1/${this.selectedYear.alias}' `,
+                // definitionExpression : `NCDOT_Demographics.DBO.${this.selectedTable.name}.OBJECTID > 1' `,
                 source: {
                   // indicates the source of the sublayer is a dynamic data layer
                   type: "data-layer",
@@ -497,11 +616,17 @@ export default {
                     },
                     rightTableSource: {
                       type: "data-layer",
-                      dataSource: {
-                        type: "table",
-                        workspaceId: "5332",
-                        dataSourceName: `NCDOT_Demographics.DBO.${this.selectedTable.name}`
+                      dataSource:{
+                        type:"query-table",
+                        workspaceId:"5332",
+                        query: `SELECT ${statsField}, ${oid_field}, ${geo_id_field}, ${year_field} ${this.selectedNormField ? normField:""}  FROM ${child} where year >= '${this.selectedYear.alias -1}-12-31' and year <= '${this.selectedYear.alias}-01-01'`,
+                        oidFields: "OBJECTID"
                       }
+                      // dataSource: {
+                      //   type: "table",
+                      //   workspaceId: "5332",
+                      //   dataSourceName: `${this.selectedTable.name}`
+                      // }
                     },
                     leftTableKey: "GEOID",
                     rightTableKey: "geo_id",
@@ -511,6 +636,9 @@ export default {
               }
             ]
             });
+          console.log(lyr)
+          
+          return lyr
 
 
 
@@ -528,7 +656,7 @@ export default {
         //               minValue: 0,  // 0 acres
         //               maxValue:0,  // 200,000 acres
         //               symbol: { type: "simple-fill", color: "#a2a4a6"},
-        //               label: "0"  
+        //               label: "0"  r
         //             },
         //             {
         //               minValue: this.min + 1,  // 0 acres
@@ -611,7 +739,8 @@ export default {
             uniqueValueInfos: [],
             normalizationField: null,
             sketchViewModel: null,
-            polygonGraphicsLayer: null
+            polygonGraphicsLayer: null,
+            selectedFeaturesData: null
         }
     }
 }

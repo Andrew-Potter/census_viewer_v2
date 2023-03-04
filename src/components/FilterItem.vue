@@ -12,7 +12,9 @@
             <label :for="option.id">{{option[display_field]}}</label>
           </div>
           <br>
-          <Button label="Ok" icon="pi pi-check" @click="acceptChoice" autofocus />
+          <template #footer>
+            <Button label="Ok" icon="pi pi-check" @click="acceptChoice" autofocus />
+          </template>
         </Dialog>
     </div>
 </template>
