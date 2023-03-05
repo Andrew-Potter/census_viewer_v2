@@ -88,6 +88,44 @@ export default {
           // this.renderAttributes()
 
         },
+        async get_historical_data(geo_id){
+          var query;
+          if (this.selectedGeoUnit.alias === "COUNTIES"){
+            query = `geo_id = '${geo_id}' and geo_name LIKE '%County%'`
+          }else{
+            query = `geo_id = '${geo_id}'`
+          }
+          var options = {
+            query: {
+              where: query,
+              outFields: ["*"],
+              f: "json"
+            },
+            responseType: "json"
+          };
+          var response = await esriRequest(baseurl + `${this.selectedTable.id}\\query`, options)
+          var chart_data = []
+          if (this.normField){
+            response.data.features.forEach(f =>{
+              chart_data.push({
+                year: new Date(f.attributes.year).getFullYear()+1,
+                geo_name: f.attributes.geo_name,
+                value: (f.attributes[this.selectedField.id]/f.attributes[this.selectedNormField.id] * 100).toPrecision(2)
+              })
+            })
+
+          }else{
+            response.data.features.forEach(f =>{
+              chart_data.push({
+                year: new Date(f.attributes[this.yearField]).getFullYear()+1,
+                geo_name:f.attributes.geo_name,
+                value: (f.attributes[this.statsField]/f.attributes[this.normField] * 100).toPrecision(2)
+              })
+            });
+          }
+          
+          console.log(response)
+        },
         async loadMap(){
             // var layer = await this.makeLayer(1, "Counties", "NCDOT_Demographics.dbo.B02001", "B02001_002", "Race|Total Population|White Alone", "2018", true, "B02001_001")
 
@@ -142,11 +180,24 @@ export default {
             var name_field = `a_${this.selectedGeoUnit.alias}.NAME`
             var this_feature = this.selectedFeaturesData[feature.graphic.attributes[oid_field]]
               var div = document.createElement("div");
-              div.innerHTML = `
+              if (this.selectedNormField){
+                div.innerHTML = `
                 Name: ${this_feature[name_field]} <br>
+                Percent: ${(this_feature[this.statsField]/this_feature[this.normField] * 100).toPrecision(2)} %<br>
+                Total: ${this_feature[this.statsField]} <br>
                 Year: ${new Date(this_feature[this.yearField]).getFullYear() + 1}<br>
                 GEOID: ${this_feature[this.geo_id_field]} <br>
               `
+              }else{
+                div.innerHTML = `
+                  Name: ${this_feature[name_field]} <br>
+                  Total: ${this_feature[this.statsField]} <br>
+                  Year: ${new Date(this_feature[this.yearField]).getFullYear() + 1}<br>
+                  GEOID: ${this_feature[this.geo_id_field]} <br>
+                `
+
+              }
+             
               this.queryGeoLayers(this_feature[this.geo_id_field])
               console.log(feature)
               // // calculate the population percent change from 2010 to 2013.
@@ -229,6 +280,7 @@ export default {
                 console.log("fail")
               }
               });
+              this.get_historical_data(geoid)
 
           
 
@@ -303,7 +355,7 @@ export default {
            
             var renderer;
             if (this.selectedNormField){
-              var selectedNormField = this.selectedNormField.alias;
+              var selectedNormField = this.selectedNormField.id;
                 var normField = res.fields.find(function(field){
                   let this_field = field.name.split(".").at(-1)
 
@@ -315,8 +367,8 @@ export default {
                 renderer = new ClassBreaksRenderer({
                 type: "class-breaks",
                 // attribute of interest - Earthquake magnitude
-                field: statsField,
-                normalizationField: normField,
+                field: this.statsField,
+                normalizationField: this.normField,
                 classBreakInfos: [
                   {
                     minValue: 0,  // 0 acres
