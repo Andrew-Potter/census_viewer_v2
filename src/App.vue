@@ -4,9 +4,7 @@
       <!-- <ToggleButton onLabel="Query Data" offLabel="QueryData" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_filters" /> -->
 
             <template #start>
-              <ToggleButton onLabel="Query Data" offLabel="Query Data" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_filters" />
-              <ToggleButton onLabel="Show Charts" offLabel="Show Charts" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_charts" />
-
+              <ToggleButton onLabel="Query Data" offLabel="Query Data" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" @click="toggleFilters" v-model="show_filters" />
             </template>
 
            
@@ -23,7 +21,7 @@
             </template>
     </Toolbar>
     <div data-flex-splitter-horizontal style="flex: auto; height:90vh">
-      <div style="width:20%" v-if="show_filters">
+      <div :style=filterWidth>
         <Card style="height:100vh; text-align: left; width:100%;">
           <template #content>
             <FilterItem filter_name="Geometry" filter_title="Geometry" :options="geometries" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
@@ -34,7 +32,7 @@
             <FilterItem filter_name="Year" filter_title="Year" :options="years" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
           </template>
           <template #footer>
-            <Button label="Run Query" @click="(runQuery = !runQuery);(filtersOpen = false); (isLoading=true)" style="margin-left: 40%;" />
+            <Button label="Run Query" @click="(runQuery = !runQuery);(filterWidth =  `style=width:0%`); (isLoading=true)" style="margin-left: 40%;" />
           </template>
 
         </Card>
@@ -73,6 +71,13 @@ export default {
         console.log(this.selectedGeometry)
       }
     ,
+    toggleFilters(){
+      if(this.show_filters){
+        this.filterWidth = "width:0%"
+      }else{
+        this.filterWidth = "width:20%"
+      }
+    },
     openFilters(){
       this.filtersOpen = true;
     },
@@ -163,6 +168,7 @@ export default {
           filtered_tables.push(t)
         }
       })
+      filtered_tables.sort()
       this.filteredTables = filtered_tables
     },
     //   let resp = await esriRequest(this.baseurl, {query:{f: "json"}, responseType: "json"})
@@ -262,7 +268,8 @@ export default {
             normalize: false,
             show_filters: true,
             show_charts: false,
-            isLoading: true
+            isLoading: true,
+            filterWidth: "style=width:20%"
 
 
 

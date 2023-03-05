@@ -14,9 +14,17 @@
               title="Select features by point">
             <span class="esri-icon-map-pin"></span>
         </div>
+        <div
+              id="open-chart"
+              class="esri-widget esri-widget--button esri-widget esri-interactive"
+              title="Open Chart"
+              @click="displayChart = true"
+              >
+            <span class="esri-icon-chart"></span>
+        </div>
         <Dialog   :visible.sync="displayChart" position="topright" :containerStyle="{width: '50vw'}">
-          <template #header>
-            Charts
+          <template #header v-if="selectedField">
+            {{ selectedField.aliasLong }}
           </template>
           <Chart type="bar" :data="basicData" :options="basicOptions" />
         </Dialog>
@@ -42,7 +50,9 @@ import UniqueValueRenderer from "@arcgis/core/renderers/UniqueValueRenderer"
 import Legend from "@arcgis/core/widgets/Legend"
 import esriRequest from "@arcgis/core/request"
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer"
-import SketchViewModel from "@arcgis/core/widgets/Sketch/SketchViewModel"
+import Sketch from "@arcgis/core/widgets/Sketch.js";
+import Expand from "@arcgis/core/widgets/Expand"
+
 
 import "flex-splitter-directive"
 import "flex-splitter-directive/styles.min.css"
@@ -52,6 +62,26 @@ import "flex-splitter-directive/styles.min.css"
 // import esriRequest from "@arcgis/core/request"
 
 var baseurl = "https://ncdotsandbox.cnr.ncsu.edu/arcgis/rest/services/DemographicApp/DemographicAppWMS/MapServer/"
+
+const CHART_COLORS = {
+  red: 'rgb(255, 99, 132)',
+  orange: 'rgb(255, 159, 64)',
+  yellow: 'rgb(255, 205, 86)',
+  green: 'rgb(75, 192, 192)',
+  blue: 'rgb(54, 162, 235)',
+  purple: 'rgb(153, 102, 255)',
+  grey: 'rgb(201, 203, 207)'
+};
+
+const NAMED_COLORS = [
+  CHART_COLORS.red,
+  CHART_COLORS.orange,
+  CHART_COLORS.yellow,
+  CHART_COLORS.green,
+  CHART_COLORS.blue,
+  CHART_COLORS.purple,
+  CHART_COLORS.grey,
+];
 
 
 export default {
@@ -87,22 +117,16 @@ export default {
         },
         async executeQuery(){
           this.geometry = this.makeLayer()
-          // this.geometry = this.makeLayer()
-          console.log(this.geometry) 
           this.map.layers = [this.geometry]
           this.renderLayer()
-          // this.geometry = await this.makeGeometry();
-          // this.attributes = await this.getAttributes()
-          // this.map.layers = [this.geometry]
-          // this.renderAttributes()
 
         },
-        async get_historical_data(geo_id){
+        async get_historical_data(geo_ids){
           var query;
           if (this.selectedGeoUnit.alias === "COUNTIES"){
-            query = `geo_id = '${geo_id}' and geo_name LIKE '%County%'`
+            query = `geo_id in ('${geo_ids.join("', '")}') and geo_name LIKE '%County%'`
           }else{
-            query = `geo_id = '${geo_id}'`
+            query = `geo_id in ('${geo_ids.join("', '")}')`
           }
           var options = {
             query: {
@@ -135,17 +159,21 @@ export default {
           
           return chart_data
         },
-        async loadMap(){
-            // var layer = await this.makeLayer(1, "Counties", "NCDOT_Demographics.dbo.B02001", "B02001_002", "Race|Total Population|White Alone", "2018", true, "B02001_001")
-
+        async selectFeatures(geometry){
             
-            // await this.renderLayer(layer, "NCDOT_Demographics.dbo.B02001", "B02001_002", false, "B02001_002", "NCDOT_Demographics.dbo.Counties", "Race|Total Population|White Alone",'2018' )
-            // this.geometry = await this.makeGeometry();
+          var response = await this.census_data_layer.queryFeatures({geometry:geometry, outFields:["*"]} )
+          var geo_ids = response.features.map(r =>{
+            return r.attributes[this.geo_id_field]
+          })
+          var new_data = await this.get_historical_data(geo_ids);
+          this.updateChart(new_data)
+          console.log(response)
+        },
+        async loadMap(){
+
             this.map = new Map({
                 basemap: "gray",
-                // layers: [this.geometry]
             })
-
 
             this.view =  new MapView({
                 container: this.$el,
@@ -157,25 +185,36 @@ export default {
               view: this.view,
             });
           this.view.ui.add(legend, "bottom-right");
-          this.view.ui.add("select-by-polygon", "top-left");
-          this.view.ui.add("select-by-point", "top-left");
+          this.view.ui.add("open-chart", "top-right");
 
           this.polygonGraphicsLayer = new GraphicsLayer();
           this.map.add(this.polygonGraphicsLayer);
-          this.sketchViewModel = new SketchViewModel({
-            view: this.view,
+          this.sketch = new Sketch({
             layer: this.polygonGraphicsLayer,
-            pointSymbol: {
-              type: "simple-marker",
-              style: "circle",
-              color: "black",
-              size: "6",
-              outline: {
-                color: "black",
-                width: 1
-              }
+            view: this.view
+          });
+          var selectFeatures = this.selectFeatures
+          this.sketch.on("create", function(event) {
+            // check if the create event's state has changed to complete indicating
+            // the graphic create operation is completed.
+            if (event.state === "complete") {
+              // remove the graphic from the layer. Sketch adds
+              // the completed graphic to the layer by default.
+              // this.polygonGraphicsLayer.remove(event.graphic);
+              console.log(event)
+              // use the graphic.geometry to query features that intersect it
+              selectFeatures(event.graphic.geometry);
             }
           });
+          var selectExpand = new Expand({
+            label: "Select",
+            expandTooltip: "Select",
+            expandIconClass: "esri-icon-sketch-rectangle",
+            view: this.view,
+            content: this.sketch,
+            group: "top-left"
+        })
+          this.view.ui.add(selectExpand, "top-left")
 
 
           // let layerlist = new LayerList({
@@ -186,12 +225,11 @@ export default {
         },
          populationChange (feature) {
             var oid_field =`a_${this.selectedGeoUnit.alias}.OBJECTID`
-            var name_field = `a_${this.selectedGeoUnit.alias}.NAME`
             var this_feature = this.selectedFeaturesData[feature.graphic.attributes[oid_field]]
               var div = document.createElement("div");
               if (this.selectedNormField){
                 div.innerHTML = `
-                Name: ${this_feature[name_field]} <br>
+                Name: ${this_feature[this.geo_name_field]} <br>
                 Percent: ${(this_feature[this.statsField]/this_feature[this.normField] * 100).toPrecision(2)} %<br>
                 Total: ${this_feature[this.statsField]} <br>
                 Year: ${new Date(this_feature[this.yearField]).getFullYear() + 1}<br>
@@ -199,7 +237,7 @@ export default {
               `
               }else{
                 div.innerHTML = `
-                  Name: ${this_feature[name_field]} <br>
+                  Name: ${this_feature[this.geo_name_field]} <br>
                   Total: ${this_feature[this.statsField]} <br>
                   Year: ${new Date(this_feature[this.yearField]).getFullYear() + 1}<br>
                   GEOID: ${this_feature[this.geo_id_field]} <br>
@@ -208,39 +246,7 @@ export default {
               }
              
               this.queryGeoLayers(this_feature[this.geo_id_field])
-              console.log(feature)
-              // // calculate the population percent change from 2010 to 2013.
-              // var selectedGeoId = feature.graphic.attributes[`NCDOT_Demographics.DBO.${this.selectedTable.name}.geo_id`]
-              // var selectedGeoName = feature.graphic.attributes[`NCDOT_Demographics.DBO.${this.selectedTable.name}.geo_name`]
-              // var year = feature.graphic.attributes[`NCDOT_Demographics.DBO.${this.selectedTable.name}.year`]
-              // this.queryGeoLayers(selectedGeoId);
-              // console.log(new Date(year).getFullYear())
-              // // queryGeoLayers(selectedGeoId);
-              // // selectFeatures(feature.graphic.geometry.centroid, chart, false)
-              // var fieldName = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedField.id}`
-              // if(this.selectedNormField){
-              //   var normFieldName = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedNormField.id}`
-              //   let proportion = feature.graphic.attributes[fieldName] / feature.graphic.attributes[normFieldName] 
-              //   let percent = proportion * 100
-              //   div.innerHTML =
-              //     `
-              //     <b>${selectedGeoName}</b><br>
-              //     ${this.selectedField.alias}: ${feature.graphic.attributes[fieldName]} <br>
-              //     Total Population: ${feature.graphic.attributes[normFieldName]} <br>
-              //     Percent: ${percent.toFixed(2)}<br>
-              //     Year: ${new Date(year).getFullYear() + 1}
-              //     `
-              // }else{
-              //   div.innerHTML =
-              //     `<b>${selectedGeoName}</b><br>
-              //     ${this.selectedField.alias}: ${feature.graphic.attributes[fieldName]} <br>
-              //     Total Population: ${feature.graphic.attributes[fieldName]} <br>
-              //     Year: ${new Date(year).getFullYear() + 1}
-              //     `
-              // }
-              
-              
-              // console.log(div.innerHTML);
+             
               this.view.popup.highlightEnabled = true
               return div;
               
@@ -289,9 +295,9 @@ export default {
                 console.log("fail")
               }
               });
-              var new_data = await this.get_historical_data(geoid)
+              var new_data = await this.get_historical_data([geoid])
               this.updateChart(new_data)
-              this.displayChart = true;
+              
 
           
 
@@ -314,6 +320,7 @@ export default {
             var census_data_layer = await this.geometry.sublayers.find(function(sublayer) {
               return sublayer.title === "Census Data";
             });
+            this.census_data_layer = census_data_layer;
             // var year_field = `NCDOT_Demographics.DBO.${this.selectedTable.name}.year`
             // census_data_layer.definitionExpression = `year <= date'1/1/2018' or year >= date'1/1/2011'`
             // var statsField = `NCDOT_Demographics.DBO.${this.selectedTable.name}.${this.selectedField.id}`
@@ -342,6 +349,12 @@ export default {
               return this_field === "geo_id"
             })
             this.geo_id_field = geo_id_field.name;
+            var geo_name_field = fields.find(function(field){
+              let this_field = field.name.split(".").at(-1)
+
+              return this_field === "geo_name"
+            })
+            this.geo_name_field = geo_name_field.name;
             // var res = await census_data_layer.queryFeatures({where:'1=1', outFields: [this.statsField, this.yearField, oid_field], returnGeometry: false});
             var res = await census_data_layer.queryFeatures({where:'1=1', outFields: ["*"], returnGeometry: false});
 
@@ -464,21 +477,10 @@ export default {
             census_data_layer.renderer = renderer;
             var popupTemplate = {
                 // autocasts as new PopupTemplate()
-                title: `{a_${this.selectedGeoUnit.alias}.NAME}`,
+                // title: `{${this.geo_name_field}}`,
                 content: this.populationChange
               }
             census_data_layer.popupTemplate = popupTemplate
-            // this.geometry.popupTemplate = popupTemplate
-            // this.map.layers = [this.geometry]
-            // var popupTemplate = {
-            //     // autocasts as new PopupTemplate()
-            //     title: `{NCDOT_Demographics.DBO.${this.selectedTable.name}.geo_name}`,
-            //     content: this.populationChange,
-            //     outFields: ["*"],
-                
-            //   }
-            // census_data_layer.popupTemplate = popupTemplate;
-          
         },
 
 
@@ -518,9 +520,6 @@ export default {
 
         },
         async getAttributes(){
-
-
-          
 
                 this.table = new FeatureLayer({
                   url:baseurl+this.selectedTable.id,
@@ -653,6 +652,7 @@ export default {
           }
           let geo_id_field = `${child}.geo_id`
           let year_field = `${child}.year`
+          let geo_name_field = `${child}.geo_name`
 
 
           // var statsField = `census.census.${this.selectedTable.name}.${this.selectedField.id.toLowerCase()}`
@@ -682,7 +682,7 @@ export default {
                       dataSource:{
                         type:"query-table",
                         workspaceId:"5332",
-                        query: `SELECT ${statsField}, ${oid_field}, ${geo_id_field}, ${year_field} ${this.selectedNormField ? normField:""}  FROM ${child} where year >= '${this.selectedYear.alias -1}-12-31' and year <= '${this.selectedYear.alias}-01-01'`,
+                        query: `SELECT ${statsField}, ${oid_field}, ${geo_id_field}, ${geo_name_field}, ${year_field} ${this.selectedNormField ? normField:""}  FROM ${child} where year >= '${this.selectedYear.alias -1}-12-31' and year <= '${this.selectedYear.alias}-01-01'`,
                         oidFields: "OBJECTID"
                       }
                       // dataSource: {
@@ -709,46 +709,6 @@ export default {
 
        async renderAttributes(){
 
-
-        // var renderer = new ClassBreaksRenderer({
-        //           type: "class-breaks",
-        //           // attribute of interest - Earthquake magnitude
-        //           field: `${this.selectedField.id}`,
-        //           classBreakInfos: [
-        //             {
-        //               minValue: 0,  // 0 acres
-        //               maxValue:0,  // 200,000 acres
-        //               symbol: { type: "simple-fill", color: "#a2a4a6"},
-        //               label: "0"  r
-        //             },
-        //             {
-        //               minValue: this.min + 1,  // 0 acres
-        //               maxValue: this.max/4,  // 200,000 acres
-        //               symbol: { type: "simple-fill", color: this.layerColors[3]},  // will be assigned sym1
-        //               label: `${this.min + 1} - ${this.max/4}`
-        //             },
-        //             {
-        //               minValue: this.max/4 + 1,  // 0 acres
-        //               maxValue: this.max/4*2,  // 200,000 acres
-        //               symbol: { type: "simple-fill", color: this.layerColors[2]},  // will be assigned sym1
-        //               label: `${this.max/4 + 1} - ${this.max/4*2}`
-        //             },
-        //             {
-        //               minValue: this.max/4 *2+ 1,  // 0 acres
-        //               maxValue: this.max/4*3,  // 200,000 acres
-        //               symbol: { type: "simple-fill", color: this.layerColors[1]},  // will be assigned sym1
-        //               label: `${this.max/4*2 + 1} - ${this.max/4*3}`
-        //             },
-        //             {
-        //               minValue: this.max/4 *3+ 1,  // 0 acres
-        //               maxValue: this.max,  // 200,000 acres
-        //               symbol: { type: "simple-fill", color: this.layerColors[0]},  // will be assigned sym1
-        //               label: `${this.max/4*3 + 1} - ${this.max}`
-        //             },
-                    
-        //           ],
-
-        //         });
         var renderer = new UniqueValueRenderer({
           field: "GEOID",
           uniqueValueInfos: this.uniqueValueInfos
@@ -788,13 +748,14 @@ export default {
             var this_dataset = newData.filter(newD => {
               return newD.geo_name === d
             })
-            var this_dataset = this_dataset.map(thisD =>{
+            this_dataset = this_dataset.map(thisD =>{
               return {x: thisD.year, y:thisD.value}
             })
-            datasets.push({data: this_dataset, label: d, backgroundColor:  'rgba(255, 99, 132, 0.2)'})
+            datasets.push({data: this_dataset, label: d, backgroundColor:  NAMED_COLORS[datasets.length]})
           })
           this.basicData.datasets = datasets;
           this.basicData.labels = labels;
+          this.displayChart = true;
           return {labels: labels, data: datasets}
         },
 
@@ -823,6 +784,14 @@ export default {
             polygonGraphicsLayer: null,
             selectedFeaturesData: null,
             displayChart: false,
+            chartColors: [
+              'rgba(255, 99, 132, 0.8)',
+              'rgba(255, 99, 132, 0.8)',
+              'rgba(255, 99, 132, 0.8)',
+              'rgba(255, 99, 132, 0.8)',
+              'rgba(255, 99, 132, 0.8)',
+              'rgba(255, 99, 132, 0.8)',
+            ],
             basicData: {
                 labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
                 datasets: [
