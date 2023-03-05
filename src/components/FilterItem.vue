@@ -5,15 +5,17 @@
                 <i class="pi pi-search" />
                 <InputText type="text" v-model="selectedOption" placeholder="Search" @click="showModal = !showModal" />
       </span>
-        <Dialog :visible.sync="showModal" :modal="true" :header="filter_title" >
-          <input  type="text" v-model="search_text" placeholder="Search" style="text-align:left;"/>
+        <Dialog :visible.sync="showModal" :modal="true" :header="filter_title" position="left" style="text-align: left;" >
+          <InputText  type="text" v-model="search_text" placeholder="Search" style="text-align:left;"/>
           <div v-for="option in filteredOptions" :key="option.id" style="text-align: left;">
-            <RadioButton :id=option.id :name="option.alias" :value="option[display_field]" v-model="selectedOption"/>   
+            <RadioButton :id=option.id :name="option.alias" :value="option[display_field]" v-model="selectedOption" />   
             <label :for="option.id">{{option[display_field]}}</label>
           </div>
           <br>
           <template #footer>
-            <Button label="Ok" icon="pi pi-check" @click="acceptChoice" autofocus />
+            <div style="text-align: left;">
+              <Button label="Ok" icon="pi pi-check" @click="acceptChoice" autofocus />
+            </div>
           </template>
         </Dialog>
     </div>

@@ -119,21 +119,21 @@ export default {
               chart_data.push({
                 year: new Date(f.attributes.year).getFullYear()+1,
                 geo_name: f.attributes.geo_name,
-                value: (f.attributes[this.selectedField.id]/f.attributes[this.selectedNormField.id] * 100).toPrecision(2)
+                value: Number.parseFloat((f.attributes[this.selectedField.id]/f.attributes[this.selectedNormField.id] * 100)).toFixed(2)
               })
             })
 
           }else{
             response.data.features.forEach(f =>{
               chart_data.push({
-                year: new Date(f.attributes[this.yearField]).getFullYear()+1,
+                year:  new Date(f.attributes.year).getFullYear()+1,
                 geo_name:f.attributes.geo_name,
-                value: (f.attributes[this.statsField]/f.attributes[this.normField] * 100).toPrecision(2)
+                value: Number.parseFloat((f.attributes[this.selectedField.id]).toFixed(2))
               })
             });
           }
           
-          console.log(response)
+          return chart_data
         },
         async loadMap(){
             // var layer = await this.makeLayer(1, "Counties", "NCDOT_Demographics.dbo.B02001", "B02001_002", "Race|Total Population|White Alone", "2018", true, "B02001_001")
@@ -289,7 +289,8 @@ export default {
                 console.log("fail")
               }
               });
-              this.get_historical_data(geoid)
+              var new_data = await this.get_historical_data(geoid)
+              this.updateChart(new_data)
               this.displayChart = true;
 
           
@@ -777,7 +778,25 @@ export default {
         async loadGeometryValues(){
           // let geomValues = await esriRequest(baseurl)
           
-        }
+        },
+        updateChart(newData){
+          var dataset_names = [...new Set(newData.map((item)=> item.geo_name))]
+          var datasets = []
+          var labels = [...new Set(newData.map((item)=> item.year))] 
+          labels.sort()
+          dataset_names.forEach(d =>{
+            var this_dataset = newData.filter(newD => {
+              return newD.geo_name === d
+            })
+            var this_dataset = this_dataset.map(thisD =>{
+              return {x: thisD.year, y:thisD.value}
+            })
+            datasets.push({data: this_dataset, label: d, backgroundColor:  'rgba(255, 99, 132, 0.2)'})
+          })
+          this.basicData.datasets = datasets;
+          this.basicData.labels = labels;
+          return {labels: labels, data: datasets}
+        },
 
       
     },

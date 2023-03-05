@@ -6,10 +6,6 @@
             <template #start>
               <ToggleButton onLabel="Query Data" offLabel="Query Data" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_filters" />
               <ToggleButton onLabel="Show Charts" offLabel="Show Charts" onIcon="pi pi-filter" offIcon="pi pi-filter" class="p-mr-2" v-model="show_charts" />
-               
-                <b style="text-align: center; font-size: large;">
-                  NCDOT Demographic Mapping and Analysis Application
-                </b>
 
             </template>
 
@@ -18,15 +14,16 @@
             
 
             <template #end>
-
-              <ToggleButton onIcon="pi pi-bars" offIcon="pi pi-bars"  v-model="showmenu"  />
+              <b style="text-align: end; font-size: large;">
+                  NCDOT Demographic Mapping and Analysis Application
+                </b>
                 <!-- <Button icon="pi pi-search" class="mr-2" />
                 <Button icon="pi pi-calendar" class="p-button-success mr-2" />
                 <Button icon="pi pi-times" class="p-button-danger" /> -->
             </template>
     </Toolbar>
     <div data-flex-splitter-horizontal style="flex: auto; height:90vh">
-      <div style="width:30%" v-if="show_filters">
+      <div style="width:20%" v-if="show_filters">
         <Card style="height:100vh; text-align: left; width:100%;">
           <template #content>
             <FilterItem filter_name="Geometry" filter_title="Geometry" :options="geometries" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
@@ -37,7 +34,7 @@
             <FilterItem filter_name="Year" filter_title="Year" :options="years" display_field="alias" @selectedOption="selectedOptionHandler($event)"/>
           </template>
           <template #footer>
-            <Button label="Run Query" icon="pi pi-run" @click="(runQuery = !runQuery);(filtersOpen = false)" style="margin-left: 40%;"/>
+            <Button label="Run Query" @click="(runQuery = !runQuery);(filtersOpen = false); (isLoading=true)" style="margin-left: 40%;" />
           </template>
 
         </Card>
@@ -264,7 +261,8 @@ export default {
             selectedNormField: null,
             normalize: false,
             show_filters: true,
-            show_charts: false
+            show_charts: false,
+            isLoading: true
 
 
 
