@@ -14,6 +14,12 @@
               title="Select features by point">
             <span class="esri-icon-map-pin"></span>
         </div>
+        <Dialog   :visible.sync="displayChart" position="topright" :containerStyle="{width: '50vw'}">
+          <template #header>
+            Charts
+          </template>
+          <Chart type="bar" :data="basicData" :options="basicOptions" />
+        </Dialog>
         
 
       </div>
@@ -71,6 +77,9 @@ export default {
         await this.loadMap()
     },
     methods:{
+      openCharts(){
+        this.displayChart = true
+      },
         async polygonSelection(){
           this.view.graphics.removeAll();
           this.sketchViewModel.create("polygon")
@@ -148,8 +157,8 @@ export default {
               view: this.view,
             });
           this.view.ui.add(legend, "bottom-right");
-          this.view.ui.add("select-by-polygon", "top-right");
-          this.view.ui.add("select-by-point", "top-right");
+          this.view.ui.add("select-by-polygon", "top-left");
+          this.view.ui.add("select-by-point", "top-left");
 
           this.polygonGraphicsLayer = new GraphicsLayer();
           this.map.add(this.polygonGraphicsLayer);
@@ -281,6 +290,7 @@ export default {
               }
               });
               this.get_historical_data(geoid)
+              this.displayChart = true;
 
           
 
@@ -792,7 +802,50 @@ export default {
             normalizationField: null,
             sketchViewModel: null,
             polygonGraphicsLayer: null,
-            selectedFeaturesData: null
+            selectedFeaturesData: null,
+            displayChart: false,
+            basicData: {
+                labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
+                datasets: [
+                    {
+                        label: 'My First dataset',
+                        backgroundColor: '#42A5F5',
+                        data: [65, 59, 80, 81, 56, 55, 40]
+                    },
+                    {
+                        label: 'My Second dataset',
+                        backgroundColor: '#FFA726',
+                        data: [28, 48, 40, 19, 86, 27, 90]
+                    }
+                ]
+            },
+            basicOptions: {
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#495057'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#495057'
+                        },
+                        grid: {
+                            color: '#ebedef'
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#495057'
+                        },
+                        grid: {
+                            color: '#ebedef'
+                        }
+                    }
+                }
+            },
         }
     }
 }
@@ -814,4 +867,15 @@ export default {
     a {
       color: #42b983;
     }
+    .box{
+      position: absolute;
+      top: 10vh;
+      right: 10px;
+      z-index: 9999;
+      text-align: center;
+      width: 500px;
+      margin-left: -75px; /* half of the width */
+      background-color:rgb(255, 255, 255);
+      height: 400px;
+  }
     </style>

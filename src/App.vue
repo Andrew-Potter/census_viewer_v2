@@ -38,9 +38,9 @@
           </template>
           <template #footer>
             <Button label="Run Query" icon="pi pi-run" @click="(runQuery = !runQuery);(filtersOpen = false)" style="margin-left: 40%;"/>
-        </template>
+          </template>
 
-      </Card>
+        </Card>
       </div>
       <div role="separator"></div>
       <div style="flex-grow: 1">
