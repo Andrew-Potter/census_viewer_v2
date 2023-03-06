@@ -1,7 +1,7 @@
 <template>
     
       <div class="mapview" style="height: 100%; width:100%;">
-        <div
+        <!-- <div
               id="select-by-polygon"
               class="esri-widget esri-widget--button esri-widget esri-interactive"
               title="Select features by rectangle"
@@ -13,7 +13,20 @@
               class="esri-widget esri-widget--button esri-widget esri-interactive"
               title="Select features by point">
             <span class="esri-icon-map-pin"></span>
-        </div>
+        </div> -->
+        <Card
+          id="sketch"
+          title="select">
+          <template #content>
+            <div id="sketch-bar"></div>
+          </template>
+          <template #footer>
+            <!-- <div style="text-align: left;">
+              <Button label="Go" style="text-align: left;" @click="selectFeatures"></Button>
+            </div> -->
+             
+          </template>
+        </Card>
         <div
               id="open-chart"
               class="esri-widget esri-widget--button esri-widget esri-interactive"
@@ -160,12 +173,27 @@ export default {
           return chart_data
         },
         async selectFeatures(geometry){
-            
+          
           var response = await this.census_data_layer.queryFeatures({geometry:geometry, outFields:["*"]} )
           var geo_ids = response.features.map(r =>{
             return r.attributes[this.geo_id_field]
           })
+          var objectids = response.features.map(r=>{
+            return r.attributes[`a_${this.selectedGeoUnit.alias}.OBJECTID`]
+          })
           var new_data = await this.get_historical_data(geo_ids);
+          this.view.whenLayerView(this.geometry).then(function(layerView){
+            layerView.highlightOptions = {
+              color: "#FF00FF", //bright fuschia
+              haloOpacity: 0.8,
+              fillOpacity: 0.3
+            };
+            // var census_data_layer = layerView.layer.sublayers.find(l =>{
+            //   return l.title = "Census Data"
+            // })
+              layerView.highlight(objectids)
+
+          })
           this.updateChart(new_data)
           console.log(response)
         },
@@ -191,7 +219,9 @@ export default {
           this.map.add(this.polygonGraphicsLayer);
           this.sketch = new Sketch({
             layer: this.polygonGraphicsLayer,
-            view: this.view
+            view: this.view,
+            container:"sketch-bar",
+            availableCreateTools: ["polygon", "rectangle"]
           });
           var selectFeatures = this.selectFeatures
           this.sketch.on("create", function(event) {
@@ -211,7 +241,7 @@ export default {
             expandTooltip: "Select",
             expandIconClass: "esri-icon-sketch-rectangle",
             view: this.view,
-            content: this.sketch,
+            content: document.getElementById("sketch"),
             group: "top-left"
         })
           this.view.ui.add(selectExpand, "top-left")
@@ -739,6 +769,18 @@ export default {
           // let geomValues = await esriRequest(baseurl)
           
         },
+        highlightPolygon(name){
+          var geo_name_field = this.geo_name_field
+          this.view.whenLayerView(this.geometry).then(function(layerView){
+            var census_data_layer = layerView.layer.sublayers.find(l =>{
+              return l.title = "Census Data"
+            })
+            census_data_layer.queryFeatures({where: `${geo_name_field}= '${name}'`} ).then(function(result){
+              layerView.highlight(result.features)
+            })
+
+          })
+        },
         updateChart(newData){
           var dataset_names = [...new Set(newData.map((item)=> item.geo_name))]
           var datasets = []
@@ -808,6 +850,14 @@ export default {
                 ]
             },
             basicOptions: {
+                  // onHover: (e) => {
+                  //       if (e.chart.tooltip.title){
+                  //         console.log(e)
+                  //         let name = e.chart.tooltip.dataPoints[0].dataset.label;
+                  //         this.highlightPolygon(name)
+                  //       }
+
+                  //   },
                 plugins: {
                     legend: {
                         labels: {
