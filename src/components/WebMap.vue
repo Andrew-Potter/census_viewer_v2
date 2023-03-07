@@ -35,7 +35,7 @@
               >
             <span class="esri-icon-chart"></span>
         </div>
-        <Dialog   :visible.sync="displayChart" position="topright" :containerStyle="{width: '50vw'}">
+        <Dialog   :visible.sync="displayChart" position="topright" :containerStyle="{width: '30vw'}">
           <template #header v-if="selectedField">
             {{ selectedField.aliasLong }}
           </template>
@@ -65,6 +65,9 @@ import esriRequest from "@arcgis/core/request"
 import GraphicsLayer from "@arcgis/core/layers/GraphicsLayer"
 import Sketch from "@arcgis/core/widgets/Sketch.js";
 import Expand from "@arcgis/core/widgets/Expand"
+import * as watchUtils from "@arcgis/core/core/watchUtils.js";
+import TextSymbol from "@arcgis/core/symbols/TextSymbol"
+import Graphic from "@arcgis/core/Graphic"
 
 
 import "flex-splitter-directive"
@@ -153,11 +156,17 @@ export default {
           var chart_data = []
           if (this.normField){
             response.data.features.forEach(f =>{
-              chart_data.push({
+              try{
+                chart_data.push({
                 year: new Date(f.attributes.year).getFullYear()+1,
                 geo_name: f.attributes.geo_name,
                 value: Number.parseFloat((f.attributes[this.selectedField.id]/f.attributes[this.selectedNormField.id] * 100)).toFixed(2)
               })
+
+              }catch{
+                "here"
+              }
+             
             })
 
           }else{
@@ -181,19 +190,43 @@ export default {
           var objectids = response.features.map(r=>{
             return r.attributes[`a_${this.selectedGeoUnit.alias}.OBJECTID`]
           })
-          var new_data = await this.get_historical_data(geo_ids);
-          this.view.whenLayerView(this.geometry).then(function(layerView){
-            layerView.highlightOptions = {
-              color: "#FF00FF", //bright fuschia
-              haloOpacity: 0.8,
-              fillOpacity: 0.3
-            };
-            // var census_data_layer = layerView.layer.sublayers.find(l =>{
-            //   return l.title = "Census Data"
-            // })
-              layerView.highlight(objectids)
-
+          var selected_features = await this.census_data_layer.queryFeatures({where:`a_${this.selectedGeoUnit.alias}.OBJECTID in (${objectids.join(',')})`, returnGeometry: true, outFields: ["*"] }) 
+          this.view.graphics.removeAll()
+          selected_features.features.forEach(f =>{
+            f.symbol = {
+                  type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                  color: [0,0,0, 0],
+                  outline: {
+                    // autocasts as new SimpleLineSymbol()
+                    color: "yellow",
+                    width: 2
+                  }
+                };
+              f.popupEnabled = false;
+              var pnt = f.geometry.centroid
+                var txt_symbol = new TextSymbol(f.attributes[this.geo_name_field])
+                txt_symbol.font.size = 12
+                txt_symbol.font.weight = "bold"
+                txt_symbol.haloColor = "white"
+                txt_symbol.haloSize = .5
+                this.view.graphics.add(new Graphic(pnt, txt_symbol))
+              this.view.graphics.add(f)
           })
+          
+          
+          var new_data = await this.get_historical_data(geo_ids);
+          // this.view.whenLayerView(this.geometry).then(function(layerView){
+          //   layerView.highlightOptions = {
+          //     color: "#FF00FF", //bright fuschia
+          //     haloOpacity: 0.8,
+          //     fillOpacity: 0.3
+          //   };
+          //   // var census_data_layer = layerView.layer.sublayers.find(l =>{
+          //   //   return l.title = "Census Data"
+          //   // })
+          //     layerView.highlight(selected_features)
+
+          // })
           this.updateChart(new_data)
           console.log(response)
         },
@@ -214,6 +247,30 @@ export default {
             });
           this.view.ui.add(legend, "bottom-right");
           this.view.ui.add("open-chart", "top-right");
+          this.view.popup.watch('selectedFeature', function(gra){
+              if(gra){
+                // view.graphics.removeAll();
+                var h = this.view.highlightOptions;
+                gra.symbol = {
+                  type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                  color: [h.color.r,h.color.g, h.color.b, h.fillOpacity],
+                  outline: {
+                    // autocasts as new SimpleLineSymbol()
+                    color: [h.color.r,h.color.g, h.color.b, h.color.a],
+                    width: 1
+                  }
+                };
+                this.highlighted_graphic = gra
+                this.view.graphics.add(this.highlighted_graphic);
+              }else{
+                this.view.graphics.remove(this.highlighted_graphic);
+              }
+            })
+          watchUtils.whenTrue(this.view.popup, "visible", function(){
+            watchUtils.whenFalseOnce(this.view.popup, "visible", function(){
+              this.view.graphics.remove(this.highlighted_graphic)
+            })
+          })
 
           this.polygonGraphicsLayer = new GraphicsLayer();
           this.map.add(this.polygonGraphicsLayer);
@@ -387,7 +444,6 @@ export default {
             this.geo_name_field = geo_name_field.name;
             // var res = await census_data_layer.queryFeatures({where:'1=1', outFields: [this.statsField, this.yearField, oid_field], returnGeometry: false});
             var res = await census_data_layer.queryFeatures({where:'1=1', outFields: ["*"], returnGeometry: false});
-
             var resultsArray = [];
             res.features.forEach(f => {
               features_data[f.attributes[oid_field]] = f.attributes
@@ -508,7 +564,8 @@ export default {
             var popupTemplate = {
                 // autocasts as new PopupTemplate()
                 // title: `{${this.geo_name_field}}`,
-                content: this.populationChange
+                content: this.populationChange,
+                highlightEnabled: true
               }
             census_data_layer.popupTemplate = popupTemplate
         },
@@ -662,17 +719,7 @@ export default {
         },
 
         makeLayer(){
-          // going to have to dump the table into memory, filtering by year, then do the dynamic join
-          // if (geo_name.includes("COUNTIES")){
-          //   var plus_def = `AND geo_name LIKE '%County%'`
-          // }else{
-          //   var plus_def = ''
-          // }
-          console.log(this.selectedYear)
-          console.log(this.selectedField)
-          console.log(this.selectedGeoUnit)
-          console.log(this.selectedTable)
-          console.log(`dbo.${this.selectedTable.name}.year = date'1/1/${this.selectedYear}' `)
+
           var child = `NCDOT_Demographics.DBO.${this.selectedTable.alias}`
           let statsField = `${child}.${this.selectedField.id}`
           let oid_field = `${child}.OBJECTID`
@@ -769,17 +816,13 @@ export default {
           // let geomValues = await esriRequest(baseurl)
           
         },
-        highlightPolygon(name){
-          var geo_name_field = this.geo_name_field
-          this.view.whenLayerView(this.geometry).then(function(layerView){
-            var census_data_layer = layerView.layer.sublayers.find(l =>{
-              return l.title = "Census Data"
-            })
-            census_data_layer.queryFeatures({where: `${geo_name_field}= '${name}'`} ).then(function(result){
-              layerView.highlight(result.features)
-            })
+        async highlightPolygon(name){
 
-          })
+          var res = await this.census_data_layer.queryFeatures({where: `a_${this.selectedGeoUnit.alias}.NAMELSAD LIKE '%${name}%'`, returnGeometry: true} )
+
+          this.view.graphics.add(res.features[0])
+
+
         },
         updateChart(newData){
           var dataset_names = [...new Set(newData.map((item)=> item.geo_name))]
